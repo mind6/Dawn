@@ -1,0 +1,19 @@
+name = "Dawn"
+uuid = "3b7c1064-bc99-4ed8-a585-047802def648"
+authors = ["mind6 <kirbyzhang@live.com>"]
+version = "0.1.0"
+
+[deps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+MyBase = "4289efa7-e349-4f9a-9180-1d6876e9637d"
+Strategies2 = "c2797a8d-4d65-4fc4-8f9f-b6531f10bf2c"
+Inherit = "341b8389-5eed-42ab-a01e-622c6bedf032"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+StreamProviders = "73e8cea0-d16f-42c3-be5a-b39e8b39c3a0"
+MyFormats = "9e651226-54cb-463c-88e6-e01e46bd6411"
+Infiltrator = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
+MyMath = "3acc21c8-f72c-400d-bb1e-3e39c4dbea48"
+Utils = "582ce82a-5fa8-45e1-82f5-1d2bceed5bd0"
+MyData = "84f8969f-4ef3-4f5d-93a1-d5d721629cc8"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
