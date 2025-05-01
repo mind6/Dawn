@@ -56,12 +56,46 @@ function tradeprovider(ctrl::TradeProviderControl) ctrl.runchain[end].prov end
 
 ################################################################################
 """
-Manages the execution of a trade run, which consists of one or more TradeProviderControls.
+Manages the execution and state of a complete trading operation. This structure contains
+all global state related to trade runs to provide better organization and isolation.
 
-- Tracking creation and execution time
-- Holding provider controls for each trade provider
-- Waiting for all provider tasks to complete before summarizing trades
+This replaces TradeRunControl and consolidates previously global variables into a 
+cohesive context object that includes:
+
+- Management of multiple trade runs
+- Tracking of current selection
+- Provider mapping
+- Trade summaries and analysis
+- Navigation state for exploring trades
 """
+mutable struct TradeRunContext
+   # Management of trade runs
+   traderuns::Vector{TradeRunControl}      # Collection of all trade runs
+   selected_idx::Int                       # Index of currently selected trade run
+   provname2provctrl::Dict{Symbol, TradeProviderControl}  # Quick lookup for providers
+   
+   # Trade analysis and summaries
+   tradesummary::Union{Nothing, AbstractDataFrame}            # all trades
+   tradesummary_gb::Union{Nothing, GroupedDataFrame}          # grouped by :provider
+   
+   monthsummary::Union{Nothing, AbstractDataFrame}            # return per month per provider
+   monthsummary_gb::Union{Nothing, GroupedDataFrame}          # grouped by :provider
+   monthsummary_combined::Union{Nothing, AbstractDataFrame}   # return per month summing all providers
+   
+   # Trade navigation state
+   curtradectrl::Union{Nothing, TradeProviderControl}  # Currently selected trade control
+   curtradeidx::Int                                    # Index of current trade
+   curdate::Union{Nothing, UnixDate}                  # Current date being viewed
+   curbday::Union{Nothing, AbstractDataFrame}         # Cache for current business day
+   
+   function TradeRunContext()
+      new(TradeRunControl[], 0, Dict{Symbol, TradeProviderControl}(),
+          nothing, nothing,
+          nothing, nothing, nothing,
+          nothing, -1, nothing, nothing)
+   end
+end
+
 mutable struct TradeRunControl
    timecreated::DateTime
    timeexecuted::Union{DateTime, Nothing}
@@ -71,4 +105,3 @@ mutable struct TradeRunControl
    trprov_ctrls::Vector{TradeProviderControl}
    runtsks::Union{Nothing, Vector{Task}}  #we must wait for the tasks to complete before summarizing trades. Note that @sync is not designed for this because it only handles *lexically* enclosed @spawns
 end
-

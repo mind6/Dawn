@@ -1,7 +1,7 @@
 """
 Creates a TradeProviderControl for each TradeProvider in the TradeRun (i.e. across all thread queues).
 
-Returns a singleton TradeRunControl object which manages the trade run (e.g. grouping together all TradeProviderControls, and providing execution management).
+Creates and manages a TradeRunControl object within the global tradecontext.
 
 Note: The columns synchronized by refchartsinks can be customized in two ways:
 1. At specification time in the PathSpec using the :ref_fields keyword argument
@@ -24,13 +24,13 @@ function createtraderun(run_name::Symbol, runspec::sg.RunSpec, usecache::Bool=tr
             # Each threadqueue has a single AUT MinuteBarProvider, but possibly multiple TradeProviders and/or ReferenceSinks. We create a TradeProviderControl for each TradeProvider, and also give it all the RefChartSinks separately, since they are not dependencies of the TradeProvider.
             @assert node.vertinfo.color == :red "TradeProvider must be red"   
             provctrl = TradeProviderControl(node, refchartsinks)
-            provname2provctrl[provctrl.providername] = provctrl
+            tradecontext.provname2provctrl[provctrl.providername] = provctrl
             push!(provctrls, provctrl)
          end
       end
    end
-   push!(traderuns, TradeRunControl(Dates.now(), nothing, nothing, run_name, r, provctrls, nothing))
-   global selected_idx = length(traderuns)
+   push!(tradecontext.traderuns, TradeRunControl(Dates.now(), nothing, nothing, run_name, r, provctrls, nothing))
+   tradecontext.selected_idx = length(tradecontext.traderuns)
 end
 
 
@@ -40,8 +40,8 @@ This is a nonblocking call. Use wait4traderun() to wait for it to complete.
 NOTE:In the future this should create listeners for transaction requests and responses.
 """
 function executetraderun(saveproviders::Bool=true)
-   if selected_idx ∉ 1:length(traderuns)
-      @error "no valid TradeRun selected at $selected_idx"
+   if tradecontext.selected_idx ∉ 1:length(tradecontext.traderuns)
+      @error "no valid TradeRun selected at $(tradecontext.selected_idx)"
       return
    end
 
@@ -65,24 +65,25 @@ end
 
 "Delete all traderuns"
 function deletetraderuns()
-   Base.empty!(traderuns)
-   global selected_idx = 0
+   Base.empty!(tradecontext.traderuns)
+   tradecontext.selected_idx = 0
 end
 
 """
 If changing index, this calls 'summarizetrades()' if run has been executed.
 """
 function selecttraderun(idx::Int)
-   if idx == selected_idx return end
+   if idx == tradecontext.selected_idx return end
 
-   n = length(traderuns)
+   n = length(tradecontext.traderuns)
    if idx in 1:n 
-      global selected_idx = idx
+      tradecontext.selected_idx = idx
+      trun = currenttraderun()
       if trun.timeexecuted !== nothing
          @info "resummarizing trades..."
          summarizetrades()
       end
-      @info "selected $(selected_idx) of $n traderuns."
+      @info "selected $(tradecontext.selected_idx) of $n traderuns."
    else
       @error "cannot select $idx out of $n traderuns"
    end
