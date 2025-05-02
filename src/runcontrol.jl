@@ -1,7 +1,7 @@
 """
 Creates a TradeProviderControl for each TradeProvider in the TradeRun (i.e. across all thread queues).
 
-Creates and manages a TradeRunControl object within the global tradecontext.
+Returns a TradeRunContext object which manages the trade run.
 
 Note: The columns synchronized by refchartsinks can be customized in two ways:
 1. At specification time in the PathSpec using the :ref_fields keyword argument
@@ -15,6 +15,7 @@ function createtraderun(run_name::Symbol, runspec::sg.RunSpec, usecache::Bool=tr
    sg.instantiate!(r)
 
    provctrls = TradeProviderControl[]
+   provname2provctrl = Dict{Symbol, TradeProviderControl}()
    for queue in r.threadqueues
 
       refchartsinks = collect(sp.RefChartSink, (n.prov for n in queue.nodes if n.prov isa sp.RefChartSink))
@@ -24,13 +25,13 @@ function createtraderun(run_name::Symbol, runspec::sg.RunSpec, usecache::Bool=tr
             # Each threadqueue has a single AUT MinuteBarProvider, but possibly multiple TradeProviders and/or ReferenceSinks. We create a TradeProviderControl for each TradeProvider, and also give it all the RefChartSinks separately, since they are not dependencies of the TradeProvider.
             @assert node.vertinfo.color == :red "TradeProvider must be red"   
             provctrl = TradeProviderControl(node, refchartsinks)
-            tradecontext.provname2provctrl[provctrl.providername] = provctrl
+            provname2provctrl[provctrl.providername] = provctrl
             push!(provctrls, provctrl)
          end
       end
    end
-   push!(tradecontext.traderuns, TradeRunControl(Dates.now(), nothing, nothing, run_name, r, provctrls, nothing))
-   tradecontext.selected_idx = length(tradecontext.traderuns)
+   push!(traderuns, TradeRunContext(Dates.now(), nothing, nothing, run_name, r, provctrls, nothing))
+   global selected_idx = length(traderuns)
 end
 
 
@@ -40,50 +41,50 @@ This is a nonblocking call. Use wait4traderun() to wait for it to complete.
 NOTE:In the future this should create listeners for transaction requests and responses.
 """
 function executetraderun(saveproviders::Bool=true)
-   if tradecontext.selected_idx ∉ 1:length(tradecontext.traderuns)
-      @error "no valid TradeRun selected at $(tradecontext.selected_idx)"
+   if selected_idx ∉ 1:length(traderuns)
+      @error "no valid TradeRun selected at $selected_idx"
       return
    end
 
-   trun = currenttraderun()
-   if trun.timeexecuted !== nothing
-      @error "selected trade run was created at $(trun.timecreated) and began executing at $(trun.timeexecuted)"
+   truncontext = currenttraderun()
+   if truncontext.info.timeexecuted !== nothing
+      @error "selected trade run was created at $(truncontext.info.timecreated) and began executing at $(truncontext.info.timeexecuted)"
       return
    end
-   trun.timeexecuted = Dates.now()
+   truncontext.info.timeexecuted = Dates.now()
 
-   sg.run!(trun.r, saveproviders) 
-   trun.runtsks = copy(sg.runtsks)
+   sg.run!(truncontext.info.r, saveproviders) 
+   truncontext.info.runtsks = copy(sg.runtsks)
 end
 
-function wait4traderun(trun::TradeRunControl=currenttraderun())
-   for tsk in trun.runtsks
+function wait4traderun(truncontext::TradeRunContext=currenttraderun())
+   for tsk in truncontext.info.runtsks
       wait(tsk)
    end
-   trun.timecompleted = Dates.now()
+   truncontext.info.timecompleted = Dates.now()
 end
 
 "Delete all traderuns"
 function deletetraderuns()
-   Base.empty!(tradecontext.traderuns)
-   tradecontext.selected_idx = 0
+   Base.empty!(traderuns)
+   global selected_idx = 0
 end
 
 """
 If changing index, this calls 'summarizetrades()' if run has been executed.
 """
 function selecttraderun(idx::Int)
-   if idx == tradecontext.selected_idx return end
+   if idx == selected_idx return end
 
-   n = length(tradecontext.traderuns)
+   n = length(traderuns)
    if idx in 1:n 
-      tradecontext.selected_idx = idx
-      trun = currenttraderun()
-      if trun.timeexecuted !== nothing
+      global selected_idx = idx
+      truncontext = currenttraderun()
+      if truncontext.info.timeexecuted !== nothing
          @info "resummarizing trades..."
          summarizetrades()
       end
-      @info "selected $(tradecontext.selected_idx) of $n traderuns."
+      @info "selected $selected_idx of $n traderuns."
    else
       @error "cannot select $idx out of $n traderuns"
    end
