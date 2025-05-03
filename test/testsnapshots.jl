@@ -31,5 +31,5 @@ begin
 	wait4traderun()
 end
 
-summarizetrades()
+ss = snapshot_summaries(nothing);
 
