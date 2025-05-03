@@ -11,15 +11,15 @@ ENV["JULIA_DEBUG"] = ""
 
 # @profview_allocs
 begin
-   deletetraderuns()
+	deletetraderuns()
 
-   createtraderun(:run_a1_1, true; ignore_cache=Type{<:Provider}[BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
+	createtraderun(:run_a1_1, true; ignore_cache=Type{<:Provider}[BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
 
-   executetraderun()
+	executetraderun()
 
 # ctrl = Dawn.provname2provctrl[:path_a3!TSLA]
 
-   wait4traderun()
+	wait4traderun()
 end
 
 summarizetrades()

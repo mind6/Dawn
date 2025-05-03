@@ -60,7 +60,7 @@ function currenttradeid()::Union{Nothing, Tuple{Symbol, DateTime}}
 	if truncontext.curtradectrl === nothing || isempty(truncontext.curtradectrl.trades)
 		return nothing
 	end
-	return (truncontext.curtradectrl.providername, truncontext.curtradectrl.trades[truncontext.curtradeidx,:datetime])      
+	return (truncontext.curtradectrl.providername, truncontext.curtradectrl.trades[truncontext.curtradeidx,:datetime])		
 end
 
 function currentdateid()::Union{Nothing, Tuple{Symbol, UnixDate}}
@@ -68,7 +68,7 @@ function currentdateid()::Union{Nothing, Tuple{Symbol, UnixDate}}
 	if truncontext.curtradectrl === nothing || truncontext.curdate === nothing
 		return nothing
 	end
-	return (truncontext.curtradectrl.providername, truncontext.curdate)      
+	return (truncontext.curtradectrl.providername, truncontext.curdate)		
 end
 
 function get_tradesummary_row()

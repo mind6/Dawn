@@ -78,7 +78,7 @@ function _synctrade2date()
 	ind = searchsortedfirst(dft.dateordinal, truncontext.curdate)
 	if ind ∈ 1:nrow(dft) && dft.dateordinal[ind] == truncontext.curdate
 		truncontext.curtradeidx = ind
-		@info "synced to trade: $(currenttradeid())"      
+		@info "synced to trade: $(currenttradeid())"		
 	end
 end
 

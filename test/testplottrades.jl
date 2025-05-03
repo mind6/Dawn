@@ -5,8 +5,8 @@ import Strategies2 as sg
 import Strategies2: @namevaluepair, path_a, path_a3
 
 test_plan::sg.PlanSpec = sg.PlanNodeSpec[
-   @namevaluepair(path_a3) =>["SPY"]=> ["TSLA"],
-   @namevaluepair(path_a) =>["VIX"]=> ["VXX"]
+	@namevaluepair(path_a3) =>["SPY"]=> ["TSLA"],
+	@namevaluepair(path_a) =>["VIX"]=> ["VXX"]
 ]
 
 # sg.find_greatest_common_date_interval(test_plan)
@@ -14,27 +14,27 @@ test_plan::sg.PlanSpec = sg.PlanNodeSpec[
 sg.test_run = sg.HistoricalRun(test_plan, DateInterval(Date("2018-01-18"), Date("2023-07-13")))
 
 begin
-   deletetraderuns()
+	deletetraderuns()
 
-   createtraderun(:test_run, true)
-   trun = Dawn.currenttraderun()
+	createtraderun(:test_run, true)
+	trun = Dawn.currenttraderun()
 
-   # ctrl = Dawn.provname2provctrl[:path_a2!BA]
-   ctrl = Dawn.provname2provctrl[:path_a3!TSLA]
+	# ctrl = Dawn.provname2provctrl[:path_a2!BA]
+	ctrl = Dawn.provname2provctrl[:path_a3!TSLA]
 
-   #=
-   Multithreaded traderun may not work with Tensorflow.
+	#=
+	Multithreaded traderun may not work with Tensorflow.
 
-   If you did createtraderun(...) with usecache=false, try executetraderun() with `julia -t 1,1 --project`
+	If you did createtraderun(...) with usecache=false, try executetraderun() with `julia -t 1,1 --project`
 
-   Maybe access to MyPython should be through DataServer, so Python code always runs in main thread.
-   =#
-   executetraderun() 
+	Maybe access to MyPython should be through DataServer, so Python code always runs in main thread.
+	=#
+	executetraderun() 
 end
 
 begin
-   wait4traderun()
-   summarizetrades()
+	wait4traderun()
+	summarizetrades()
 end
 
 plt=DawnPluto.plot_tradesummary().Plot
@@ -45,7 +45,7 @@ plt=DawnPluto.plot_tradesummary().Plot
 
 To see what was produced by the trade provider that produced the saved provider file:
 
-   dropmissing(DataFrame(trun.trprov_ctrls[1].runchain[end].prov.data),:tradeaction)
+	dropmissing(DataFrame(trun.trprov_ctrls[1].runchain[end].prov.data),:tradeaction)
 
 
 Very mysterious failure around K:\DevDocuments\fourthwave\savedproviders\savedprovider_49e322fe8a94fae990e39e6bdd24bab1f7689a4e.jld2

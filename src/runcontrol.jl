@@ -11,7 +11,7 @@ function createtraderun(run_name::Symbol, args...; kwargs...)
 	createtraderun(run_name, getproperty(sg, run_name), args...; kwargs...)
 end
 function createtraderun(run_name::Symbol, runspec::sg.RunSpec, usecache::Bool=true; ignore_cache::Vector{Type{<:Provider}}=Type{<:Provider}[])
-	r = sg.TradeRun(runspec, usecache; ignore_cache=ignore_cache)   
+	r = sg.TradeRun(runspec, usecache; ignore_cache=ignore_cache)	
 	sg.instantiate!(r)
 
 	provctrls = TradeProviderControl[]
@@ -23,7 +23,7 @@ function createtraderun(run_name::Symbol, runspec::sg.RunSpec, usecache::Bool=tr
 		for node in queue.nodes 
 			if node.prov isa sp.AbsTradeProvider
 				# Each threadqueue has a single AUT MinuteBarProvider, but possibly multiple TradeProviders and/or ReferenceSinks. We create a TradeProviderControl for each TradeProvider, and also give it all the RefChartSinks separately, since they are not dependencies of the TradeProvider.
-				@assert node.vertinfo.color == :red "TradeProvider must be red"   
+				@assert node.vertinfo.color == :red "TradeProvider must be red"	
 				provctrl = TradeProviderControl(node, refchartsinks)
 				provname2provctrl[provctrl.providername] = provctrl
 				push!(provctrls, provctrl)

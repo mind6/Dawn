@@ -16,24 +16,24 @@ sg.test_run = sg.HistoricalRun(test_plan, DateInterval(Date("2019-08-01"), Date(
 # sg.test_run = sg.HistoricalRun(test_plan, dateinterval)
 
 begin
-   deletetraderuns()
+	deletetraderuns()
 
-   createtraderun(:test_run, false)
-   trun = Dawn.currenttraderun()
+	createtraderun(:test_run, false)
+	trun = Dawn.currenttraderun()
 
-   # ctrl = Dawn.provname2provctrl[:path_a2!BA]
-   # ctrl = Dawn.provname2provctrl[:path_a3!TSLA]
+	# ctrl = Dawn.provname2provctrl[:path_a2!BA]
+	# ctrl = Dawn.provname2provctrl[:path_a3!TSLA]
 
-   #=
-   Multithreaded traderun may not work with Tensorflow.
+	#=
+	Multithreaded traderun may not work with Tensorflow.
 
-   If you did createtraderun(...) with usecache=false, try executetraderun() with `julia -t 1,1 --project`
+	If you did createtraderun(...) with usecache=false, try executetraderun() with `julia -t 1,1 --project`
 
-   Maybe access to MyPython should be through DataServer, so Python code always runs in main thread.
-   =#
-   executetraderun() 
-   wait4traderun()
-   summarizetrades()
+	Maybe access to MyPython should be through DataServer, so Python code always runs in main thread.
+	=#
+	executetraderun() 
+	wait4traderun()
+	summarizetrades()
 end
 
 
