@@ -7,24 +7,28 @@ using DataFrames, ProgressMeter
 """
 populate TradeProviderControls with dataframes that summarize the trades which have been requested (and executed).
 
-Returns concatenated and transformed trade data across all provider controls in current trade run.
+Returns TradeRunSummary containing all trade summaries.
 """
-function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time::Union{Nothing, DateTime}=nothing)
+function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time::Union{Nothing, DateTime}=nothing)::TradeRunSummary
 	ctx = currenttraderun()
-	ctx.summaries_excluded = last_snapshot_time
 	
 	# Process each TradeProviderControl and prepare its data
 	pbar = Progress(length(ctx.trprov_ctrls), desc="summarizing trades", showspeed=true, barlen=50)
+	provider_summaries = TradeProviderSummary[]
+	provname2summary = Dict{Symbol, TradeProviderSummary}()
+	
 	for provctrl in ctx.trprov_ctrls
 		# Prepare provider data
-		summarize_provider_trades(provctrl, strategy_prefix, last_snapshot_time)
+		summary = summarize_provider_trades(provctrl, strategy_prefix, last_snapshot_time)
+		push!(provider_summaries, summary)
+		provname2summary[summary.providername] = summary
 		next!(pbar)
 	end
 	finish!(pbar)
 	@info "Creating merged trade summary"
 
 	# Combine all provider trades into a single dataframe
-	all_exitres = [provctrl.exitres for provctrl in ctx.trprov_ctrls]
+	all_exitres = [summary.exitres for summary in provider_summaries]
 	if isempty(all_exitres)
 		@warn "No trade results found, " * (last_snapshot_time === nothing ? "have you called executetraderun()?" : "last_snapshot_time is $(last_snapshot_time).")
 	end
@@ -34,7 +38,7 @@ function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time
 	profit_col = Symbol(strategy_prefix, :_dollar_profit)
 
 	### create the trade summary dataframe
-	let df = vcat(all_exitres...; cols=:union)
+	tradesummary = let df = vcat(all_exitres...; cols=:union)
 		sort!(df, :datetime)
 		colnames = propertynames(df)
 		if !isempty(df) && (retcol ∉ colnames || profit_col ∉ colnames)
@@ -60,11 +64,11 @@ function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time
 		metadata!(df, "dollar_profit", mean(df[!, profit_col]))
 		metadata!(df, "log_ret", mean(df[!, retcol]))
 
-		ctx.tradesummary = df
+		df
 	end
 
 	### create the grouped trade summary dataframe
-	let gdf = groupby(ctx.tradesummary, :provider)
+	tradesummary_gb = let gdf = groupby(tradesummary, :provider)
 		# Validate grouped trades
 		for grp in gdf
 			if !issorted(grp.datetime)
@@ -75,12 +79,28 @@ function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time
 			end
 		end
 		transform!(gdf, retcol => cumsum => :provider_cumret)
-
-		ctx.tradesummary_gb = gdf
+		gdf
 	end
 	
 	# Create monthly summaries
-	return create_monthly_summaries(ctx, retcol)
+	monthsummary, monthsummary_gb, monthsummary_combined = create_monthly_summaries(tradesummary, retcol)
+	
+	# Create the complete summary
+	summary = TradeRunSummary(
+		provider_summaries,
+		provname2summary,
+		last_snapshot_time,
+		tradesummary,
+		tradesummary_gb,
+		monthsummary,
+		monthsummary_gb,
+		monthsummary_combined
+	)
+	
+	# Store in the context for navigation
+	ctx.summary = summary
+	
+	return summary
 end
 
 """
@@ -97,35 +117,35 @@ function detect_strategy_prefix(truncontext::TradeRunContext, default_prefix::Sy
 end
 
 """
-Create monthly summary dataframes for the trade run context
+Create monthly summary dataframes
 """
-function create_monthly_summaries(truncontext::TradeRunContext, retcol::Symbol)
+function create_monthly_summaries(tradesummary::AbstractDataFrame, retcol::Symbol)
 	# Monthly returns by provider
-	gb = groupby(truncontext.tradesummary, [:provider, :month])
+	gb = groupby(tradesummary, [:provider, :month])
 	df = combine(gb, retcol => sum => :prov_mo_ret)
-	truncontext.monthsummary_gb = groupby(df, :provider)
-	truncontext.monthsummary = transform!(truncontext.monthsummary_gb, :prov_mo_ret => cumsum => :prov_cum_mo_ret)
+	monthsummary_gb = groupby(df, :provider)
+	monthsummary = transform!(monthsummary_gb, :prov_mo_ret => cumsum => :prov_cum_mo_ret)
 	
 	# Monthly returns combined across all providers
-	df = combine(groupby(truncontext.monthsummary, :month), :prov_mo_ret => sum => :combined_mo_ret)
+	df = combine(groupby(monthsummary, :month), :prov_mo_ret => sum => :combined_mo_ret)
 	transform!(df, :combined_mo_ret => cumsum => :combined_cum_mo_ret)
-	truncontext.monthsummary_combined = df
-	metadata!(truncontext.monthsummary_combined, "sortinoratio", MyMath.sortinoratio_annualized(df; datetime_col=:month, logret_col=:combined_mo_ret)[1])
+	monthsummary_combined = df
+	metadata!(monthsummary_combined, "sortinoratio", MyMath.sortinoratio_annualized(df; datetime_col=:month, logret_col=:combined_mo_ret)[1])
 	
-	return truncontext.monthsummary
+	return (monthsummary, monthsummary_gb, monthsummary_combined)
 end
 
 """
 Summarize trades for a single provider control
 """
-function summarize_provider_trades(provctrl::TradeProviderControl, strategy_prefix::Symbol, last_snapshot_time::Union{Nothing, DateTime}=nothing) 
+function summarize_provider_trades(provctrl::TradeProviderControl, strategy_prefix::Symbol, last_snapshot_time::Union{Nothing, DateTime}=nothing)::TradeProviderSummary
 	@debug "Summarizing trades for $(provctrl.providername)"
 
 	# Get the AUT (Asset Under Trade)
 	AUT = provctrl.runchain[end].prov.meta[:AUT]
 	
 	# Create combined data from all providers in the runchain
-	let df = sp.combined_provider_data([[rn.prov for rn in provctrl.runchain]; provctrl.refchartsinks])
+	combineddata = let df = sp.combined_provider_data([[rn.prov for rn in provctrl.runchain]; provctrl.refchartsinks])
 		if last_snapshot_time !== nothing
 			# Find the first row index that is later than last_snapshot_time
 			start_idx = searchsortedfirst(df.datetime, last_snapshot_time, lt=(<=))
@@ -140,18 +160,19 @@ function summarize_provider_trades(provctrl::TradeProviderControl, strategy_pref
 		end
 		metadata!(df, "symbol", AUT; style=:note)
 		MyData.setcolumn_asindex!(df, :datetime)
-		provctrl.combineddata = df
+		df
 	end
 	
 	# Extract trades
-	provctrl.trades = filter(:exitstrat_onenter => !ismissing, provctrl.combineddata)
-	metadata!(provctrl.trades, "symbol", AUT; style=:note)
-	MyData.setcolumn_asindex!(provctrl.trades, :datetime)
+	trades = filter(:exitstrat_onenter => !ismissing, combineddata)
+	metadata!(trades, "symbol", AUT; style=:note)
+	MyData.setcolumn_asindex!(trades, :datetime)
 	
 	# Create exit results (melted trades dataframe)
-	provctrl.exitres = DataFrame(provider=[], datetime=DateTime[], tradeaction=MyFormats.TradeAction[])
+	exitres = DataFrame(provider=[], datetime=DateTime[], tradeaction=MyFormats.TradeAction[])
+	exitprefixes = Set{Symbol}()
 	
-	for trrow in eachrow(provctrl.trades)
+	for trrow in eachrow(trades)
 		colnames = [[:datetime, :tradeaction]; get_reference_columnnames(provctrl.refchartsinks...)]
 		
 		newrow = Pair{Symbol, Any}[:provider => provctrl.providername, :AUT_close => trrow.close]
@@ -165,9 +186,17 @@ function summarize_provider_trades(provctrl::TradeProviderControl, strategy_pref
 			push!(newrow, Symbol(pre, :_log_return) => strat.log_return)
 			push!(newrow, Symbol(pre, :_dollar_profit) => strat.dollar_profit)
 			push!(newrow, Symbol(pre, :_elapsed) => strat.elapsed)
-			push!(provctrl.exitprefixes, pre)
+			push!(exitprefixes, pre)
 		end
 		
-		push!(provctrl.exitres, NamedTuple(newrow); cols=:union)
+		push!(exitres, NamedTuple(newrow); cols=:union)
 	end
+	
+	return TradeProviderSummary(
+		provctrl.providername,
+		combineddata,
+		trades,
+		exitres,
+		exitprefixes
+	)
 end

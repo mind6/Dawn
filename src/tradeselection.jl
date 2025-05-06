@@ -9,15 +9,28 @@ function selecttrade(timeoftrade::DateTime; provname::Union{Nothing, Symbol}=not
 		return
 	end
 	truncontext = currenttraderun()
+	
+	if truncontext.summary === nothing
+		error("No trade summary available. Have you called summarizetrades()?")
+	end
+	
 	truncontext.curtradectrl = provname === nothing ? 
 		truncontext.trprov_ctrls[1] : get_tradeprovctrl_by_providername(provname)
-	if isempty(truncontext.curtradectrl.trades)
+	
+	# Get the trades from the summary
+	if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+		error("No summary found for provider $(truncontext.curtradectrl.providername)")
+	end
+	provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+	trades = provsummary.trades
+	
+	if isempty(trades)
 		error("no trades were found for $(truncontext.curtradectrl.providername). Have you called executetraderun()?")
 	end
 
 	truncontext.curtradeidx = timeoftrade === nothing ?
-		1 : MyData.getloc(truncontext.curtradectrl.trades, timeoftrade)
-	truncontext.curdate = truncontext.curtradectrl.trades[truncontext.curtradeidx, :dateordinal]
+		1 : MyData.getloc(trades, timeoftrade)
+	truncontext.curdate = trades[truncontext.curtradeidx, :dateordinal]
 	@info "selected trade: $(currenttradeid())"
 	@info "selected date: $(currentdateid())"
 end
@@ -32,12 +45,25 @@ function _nextrade(offset::Int)
 	offset ∈ [-1, 1] || error("offset must be -1 or 1")
 
 	truncontext = currenttraderun()
-	if truncontext.curtradectrl === nothing || isempty(truncontext.curtradectrl.trades)
+	if truncontext.curtradectrl === nothing || truncontext.summary === nothing
 		@error "no trades selected"
 		return
 	end
-	truncontext.curtradeidx = MyMath.modind(truncontext.curtradeidx + offset, nrow(truncontext.curtradectrl.trades))
-	truncontext.curdate = truncontext.curtradectrl.trades[truncontext.curtradeidx,:dateordinal]
+	
+	# Get trades from summary
+	if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+		error("No summary found for current provider")
+	end
+	provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+	trades = provsummary.trades
+	
+	if isempty(trades)
+		@error "no trades found for current provider"
+		return
+	end
+	
+	truncontext.curtradeidx = MyMath.modind(truncontext.curtradeidx + offset, nrow(trades))
+	truncontext.curdate = trades[truncontext.curtradeidx,:dateordinal]
 	@info "selected trade: $(currenttradeid())"
 	@info "selected date: $(currentdateid())"
 end
@@ -45,10 +71,18 @@ end
 
 function _prevday()
 	truncontext = currenttraderun()
-	if truncontext.curtradectrl === nothing || truncontext.curdate === nothing 
-		@warn "previous day navigation requires call to initselections() first"
+	if truncontext.curtradectrl === nothing || truncontext.curdate === nothing || truncontext.summary === nothing
+		@warn "previous day navigation requires call to selecttrade() first"
+		return
 	end
-	bm1 = truncontext.curtradectrl.combineddata
+	
+	# Get combineddata from summary
+	if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+		error("No summary found for current provider")
+	end
+	provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+	bm1 = provsummary.combineddata
+	
 	ind = searchsortedlast(bm1.dateordinal, truncontext.curdate)
 	ind -= 1
 	truncontext.curdate = bm1.dateordinal[ind]
@@ -57,10 +91,18 @@ end
 
 function _nextday()
 	truncontext = currenttraderun()
-	if truncontext.curtradectrl === nothing || truncontext.curdate === nothing 
-		@warn "next day navigation requires call to initselections() first"
+	if truncontext.curtradectrl === nothing || truncontext.curdate === nothing || truncontext.summary === nothing
+		@warn "next day navigation requires call to selecttrade() first"
+		return
 	end
-	bm1 = truncontext.curtradectrl.combineddata
+	
+	# Get combineddata from summary
+	if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+		error("No summary found for current provider")
+	end
+	provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+	bm1 = provsummary.combineddata
+	
 	ind = searchsortedfirst(bm1.dateordinal, truncontext.curdate)
 	ind += 1
 	truncontext.curdate = bm1.dateordinal[ind]
@@ -70,11 +112,22 @@ end
 "Update curtradeidx if there is a trade on the newly selected day."
 function _synctrade2date()
 	truncontext = currenttraderun()
-	if truncontext.curtradectrl === nothing || isempty(truncontext.curtradectrl.trades) || truncontext.curdate === nothing
-		@warn "sync navigation requires call to initselections() first"
+	if truncontext.curtradectrl === nothing || truncontext.curdate === nothing || truncontext.summary === nothing
+		@warn "sync navigation requires call to selecttrade() first"
+		return
 	end
 
-	dft = truncontext.curtradectrl.trades
+	# Get trades from summary
+	if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+		error("No summary found for current provider")
+	end
+	provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+	dft = provsummary.trades
+	
+	if isempty(dft)
+		return
+	end
+	
 	ind = searchsortedfirst(dft.dateordinal, truncontext.curdate)
 	if ind ∈ 1:nrow(dft) && dft.dateordinal[ind] == truncontext.curdate
 		truncontext.curtradeidx = ind

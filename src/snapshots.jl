@@ -1,21 +1,15 @@
-SnapShotResult = @NamedTuple{provname2combineddata::Dict{Symbol, DataFrame}, tradesummary::DataFrame, monthsummary::DataFrame, monthsummary_combined::DataFrame}
-
 """
 Briefly acquires semaphore locks on all stream providers.
-Returns time of the combined dataframe from all providers, for all rows past last_snapshot_time.
+Returns TradeRunSummary for the snapshot data.
 """
-function snapshot_summaries(last_snapshot_time::Union{Nothing, DateTime})::SnapShotResult
+function snapshot_summaries(last_snapshot_time::Union{Nothing, DateTime})::TradeRunSummary
 	ctx = currenttraderun()
 	try
 		lock_context(ctx)
 
-		summarizetrades(;last_snapshot_time=last_snapshot_time)
-		provname2combineddata = Dict{Symbol, DataFrame}()
-		for provctrl in ctx.trprov_ctrls
-			provname2combineddata[provctrl.providername] = provctrl.combineddata
-		end
-
-		return SnapShotResult(tuple(provname2combineddata, ctx.tradesummary, ctx.monthsummary, ctx.monthsummary_combined))
+		summary = summarizetrades(;last_snapshot_time=last_snapshot_time)
+		
+		return summary
 	finally
 		unlock_context(ctx)
 	end
@@ -51,4 +45,3 @@ function lock_runchain(provctrl::TradeProviderControl, lockit::Bool=true)
 		end
 	end
 end
-

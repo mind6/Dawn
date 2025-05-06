@@ -1,21 +1,43 @@
 ################################################################################
 """
+Summarization data for a single trade provider
+"""
+struct TradeProviderSummary
+	const providername::Symbol
+	const combineddata::DataFrame  #all data from the runchain, including reference data
+	const trades::DataFrame        #filtered combineddata to include only trades
+	const exitres::DataFrame       #melted trades dataframe with rows corresponding to tradeactions like enter, exit, etc.
+	const exitprefixes::Set{Symbol}  #uniquely identifies exit strategies which have been detected in TradeProvider
+end
+
+################################################################################
+"""
+Complete summarization results for a trade run
+"""
+struct TradeRunSummary
+	const provider_summaries::Vector{TradeProviderSummary}
+	const provname2summary::Dict{Symbol, TradeProviderSummary}
+	
+	# Trade analysis and summaries
+	const summaries_excluded::Union{Nothing, DateTime}  #last_snapshot_time of trades that were excluded from the summary
+	const tradesummary::AbstractDataFrame               # all trades
+	const tradesummary_gb::GroupedDataFrame            # grouped by :provider
+	
+	const monthsummary::AbstractDataFrame              # return per month per provider
+	const monthsummary_gb::GroupedDataFrame            # grouped by :provider
+	const monthsummary_combined::AbstractDataFrame     # return per month summing all providers
+end
+
+################################################################################
+"""
 Controls a chain of providers that feed into a single trade provider. Used to:
 - Track the execution status of provider tasks
-- Generate combined trade data and summaries
-- Manage exit strategy results
+- Manage the provider chain configuration
 """
 mutable struct TradeProviderControl
 	const providername::Symbol
 	const runchain::Vector{sg.RunNode}  #the list of dependencies which feed into the trade provider
 	const refchartsinks::Vector{sp.RefChartSink}  #Reference signals which have been setup by the TradingPlan. Each refchartsink is used to handle a single set of named columns, from any number of reference providers.
-
-	### Fields populated during summarization
-
-	combineddata::Union{DataFrame, Nothing}  #all data from the runchain, including reference data. This is the data accessed by get_twodays_bm1() and get_bm1_row()
-	trades::Union{DataFrame, Nothing}   #filtered combineddata to include only trades
-	exitres::Union{DataFrame, Nothing}  #melted trades dataframe with rows corresponding to tradeactions like enter, exit, etc.
-	exitprefixes::Set{Symbol}  #uniquely identifies exit strategies which have been detected in TradeProvider. These prefixes are used in column names of exitres
 
 	"""
 	Given a RunNode that contains a AbsTradeProvider, finds the chain of RunNodes (with same AUT, where data is semantically dependent on the previous node in the chain) using breadsth-first-search (this results in nicer ordering of columns compared to DFS)
@@ -47,7 +69,7 @@ mutable struct TradeProviderControl
 
 		@assert count(rn->rn.prov isa sp.AbsTradeProvider, runchain) == 1 "each runchain must have exactly one AbsTradeProvider"
 		providername = Symbol(runchain[end].prov.meta[:pathname],'!', runchain[end].prov.meta[:AUT])
-		new(providername, runchain, refchartsinks, nothing, nothing, nothing, Set{Symbol}())
+		new(providername, runchain, refchartsinks)
 	end
 end
 
@@ -73,8 +95,8 @@ Manages the execution of a trade run, replacing the previous TradeRunControl con
 
 This structure contains:
 - Provider controls for each trade provider
-- Summary and analysis results
 - Navigation state for exploring trades
+- Current run summary for navigation
 
 Multiple TradeRunContext objects can exist, with traderuns and selected_idx remaining as globals.
 """
@@ -85,14 +107,8 @@ mutable struct TradeRunContext
 	# Provider mapping
 	provname2provctrl::Dict{Symbol, TradeProviderControl}  # Quick lookup for providers
 	
-	# Trade analysis and summaries
-	summaries_excluded::Union{Nothing, DateTime}  #last_snapshot_time of trades that were excluded from the summary
-	tradesummary::Union{Nothing, AbstractDataFrame}            # all trades
-	tradesummary_gb::Union{Nothing, GroupedDataFrame}          # grouped by :provider
-	
-	monthsummary::Union{Nothing, AbstractDataFrame}            # return per month per provider
-	monthsummary_gb::Union{Nothing, GroupedDataFrame}          # grouped by :provider
-	monthsummary_combined::Union{Nothing, AbstractDataFrame}   # return per month summing all providers
+	# Trade summary for navigation
+	summary::Union{Nothing, TradeRunSummary}  # Current summary data
 	
 	# Trade navigation state
 	curtradectrl::Union{Nothing, TradeProviderControl}  # Currently selected trade control
@@ -103,8 +119,6 @@ mutable struct TradeRunContext
 	function TradeRunContext(run_name::Symbol, r::sg.TradeRun, provctrls::Vector{TradeProviderControl})
 		info = TradeRunInfo(Dates.now(), nothing, nothing, run_name, r, nothing)
 		new(info, provctrls, Dict{Symbol, TradeProviderControl}(),
-			 nothing,nothing, nothing,
-			 nothing, nothing, nothing,
-			 nothing, -1, nothing, nothing)
+			 nothing, nothing, -1, nothing, nothing)
 	end
 end

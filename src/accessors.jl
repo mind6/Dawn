@@ -39,8 +39,16 @@ function currenttraderun() traderuns[selected_idx] end
 "Returns providername and timeoftrade "
 function currenttrade()::Union{Nothing, DataFrameRow}
 	truncontext = currenttraderun()
-	if truncontext.curtradectrl !== nothing
-		truncontext.curtradectrl.trades[truncontext.curtradeidx,:]
+	if truncontext.curtradectrl !== nothing && truncontext.summary !== nothing
+		if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+			return nothing
+		end
+		provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+		if !isempty(provsummary.trades) && truncontext.curtradeidx in 1:nrow(provsummary.trades)
+			provsummary.trades[truncontext.curtradeidx,:]
+		else
+			nothing
+		end
 	else
 		nothing
 	end
@@ -57,10 +65,17 @@ end
 
 function currenttradeid()::Union{Nothing, Tuple{Symbol, DateTime}}
 	truncontext = currenttraderun()
-	if truncontext.curtradectrl === nothing || isempty(truncontext.curtradectrl.trades)
+	if truncontext.curtradectrl === nothing || truncontext.summary === nothing
 		return nothing
 	end
-	return (truncontext.curtradectrl.providername, truncontext.curtradectrl.trades[truncontext.curtradeidx,:datetime])		
+	if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+		return nothing
+	end
+	provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+	if isempty(provsummary.trades) || truncontext.curtradeidx ∉ 1:nrow(provsummary.trades)
+		return nothing
+	end
+	return (truncontext.curtradectrl.providername, provsummary.trades[truncontext.curtradeidx,:datetime])		
 end
 
 function currentdateid()::Union{Nothing, Tuple{Symbol, UnixDate}}
@@ -73,18 +88,35 @@ end
 
 function get_tradesummary_row()
 	truncontext = currenttraderun()
-	get_tradesummary_row(truncontext.curtradectrl.providername, truncontext.curtradectrl.trades[truncontext.curtradeidx,:datetime])
+	if truncontext.curtradectrl === nothing || truncontext.summary === nothing
+		error("No current trade selected or summary available")
+	end
+	if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+		error("No summary found for current provider")
+	end
+	provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+	get_tradesummary_row(truncontext.curtradectrl.providername, provsummary.trades[truncontext.curtradeidx,:datetime])
 end
 
 function get_tradesummary_row(provider::Symbol, datetime::DateTime)
 	truncontext = currenttraderun()
-	subdf = truncontext.tradesummary_gb[(provider, )]
+	if truncontext.summary === nothing
+		error("No trade summary available. Have you called summarizetrades()?")
+	end
+	subdf = truncontext.summary.tradesummary_gb[(provider, )]
 	subdf[MyData.getloc(subdf.datetime, datetime), :]
 end
 
 function get_bm1_row(provname::Symbol, datetime::DateTime)
 	truncontext = currenttraderun()
-	df = truncontext.provname2provctrl[provname].combineddata
+	if truncontext.summary === nothing
+		error("No trade summary available. Have you called summarizetrades()?")
+	end
+	if !haskey(truncontext.summary.provname2summary, provname)
+		error("No summary found for provider $provname")
+	end
+	provsummary = truncontext.summary.provname2summary[provname]
+	df = provsummary.combineddata
 	df[MyData.getloc(df, datetime), :]
 end
 
@@ -107,9 +139,16 @@ end
 "Get current day's plus previous available trading day's minute bars from 'provider_ctrl.combineddata' corresponding to the given 'provname'. All provider supplies stats will be included."
 function get_twodays_bm1()::AbstractDataFrame
 	truncontext = currenttraderun()
-	if truncontext.curdate === nothing return DataFrame() end
+	if truncontext.curdate === nothing || truncontext.summary === nothing || truncontext.curtradectrl === nothing
+		return DataFrame()
+	end
 
-	bm1 = truncontext.curtradectrl.combineddata
+	if !haskey(truncontext.summary.provname2summary, truncontext.curtradectrl.providername)
+		error("No summary found for current provider")
+	end
+	provsummary = truncontext.summary.provname2summary[truncontext.curtradectrl.providername]
+	bm1 = provsummary.combineddata
+	
 	bm1start=searchsortedfirst(bm1.dateordinal, truncontext.curdate)
 	bm1end=searchsortedlast(bm1.dateordinal, truncontext.curdate)  
 	if bm1start != 1 
