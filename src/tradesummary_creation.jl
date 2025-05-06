@@ -85,8 +85,8 @@ function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time
 	# Create monthly summaries
 	monthsummary, monthsummary_gb, monthsummary_combined = create_monthly_summaries(tradesummary, retcol)
 	
-	# Create the complete summary
-	summary = TradeRunSummary(
+	# Return the complete summary with initialized navigation state
+	return TradeRunSummary(
 		provider_summaries,
 		provname2summary,
 		last_snapshot_time,
@@ -94,13 +94,12 @@ function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time
 		tradesummary_gb,
 		monthsummary,
 		monthsummary_gb,
-		monthsummary_combined
+		monthsummary_combined,
+		nothing,  # curtradectrl_name
+		0,        # curtradeidx
+		nothing,  # curdate
+		nothing   # curbday
 	)
-	
-	# Store in the context for navigation
-	ctx.summary = summary
-	
-	return summary
 end
 
 """

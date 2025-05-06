@@ -3,29 +3,35 @@
 Summarization data for a single trade provider
 """
 struct TradeProviderSummary
-	const providername::Symbol
-	const combineddata::DataFrame  #all data from the runchain, including reference data
-	const trades::DataFrame        #filtered combineddata to include only trades
-	const exitres::DataFrame       #melted trades dataframe with rows corresponding to tradeactions like enter, exit, etc.
-	const exitprefixes::Set{Symbol}  #uniquely identifies exit strategies which have been detected in TradeProvider
+	providername::Symbol
+	combineddata::DataFrame  #all data from the runchain, including reference data
+	trades::DataFrame        #filtered combineddata to include only trades
+	exitres::DataFrame       #melted trades dataframe with rows corresponding to tradeactions like enter, exit, etc.
+	exitprefixes::Set{Symbol}  #uniquely identifies exit strategies which have been detected in TradeProvider
 end
 
 ################################################################################
 """
-Complete summarization results for a trade run
+Complete summarization results for a trade run with navigation state
 """
-struct TradeRunSummary
-	const provider_summaries::Vector{TradeProviderSummary}
-	const provname2summary::Dict{Symbol, TradeProviderSummary}
+mutable struct TradeRunSummary
+	provider_summaries::Vector{TradeProviderSummary}
+	provname2summary::Dict{Symbol, TradeProviderSummary}
 	
 	# Trade analysis and summaries
-	const summaries_excluded::Union{Nothing, DateTime}  #last_snapshot_time of trades that were excluded from the summary
-	const tradesummary::AbstractDataFrame               # all trades
-	const tradesummary_gb::GroupedDataFrame            # grouped by :provider
+	summaries_excluded::Union{Nothing, DateTime}  #last_snapshot_time of trades that were excluded from the summary
+	tradesummary::AbstractDataFrame               # all trades
+	tradesummary_gb::GroupedDataFrame            # grouped by :provider
 	
-	const monthsummary::AbstractDataFrame              # return per month per provider
-	const monthsummary_gb::GroupedDataFrame            # grouped by :provider
-	const monthsummary_combined::AbstractDataFrame     # return per month summing all providers
+	monthsummary::AbstractDataFrame              # return per month per provider
+	monthsummary_gb::GroupedDataFrame            # grouped by :provider
+	monthsummary_combined::AbstractDataFrame     # return per month summing all providers
+	
+	# Trade navigation state (for browsing in remote process)
+	curtradectrl_name::Union{Nothing, Symbol}    # Currently selected trade provider name
+	curtradeidx::Int                             # Index of current trade
+	curdate::Union{Nothing, UnixDate}           # Current date being viewed
+	curbday::Union{Nothing, AbstractDataFrame}  # Cache for current business day
 end
 
 ################################################################################
@@ -95,8 +101,7 @@ Manages the execution of a trade run, replacing the previous TradeRunControl con
 
 This structure contains:
 - Provider controls for each trade provider
-- Navigation state for exploring trades
-- Current run summary for navigation
+- Provider mapping for quick lookup
 
 Multiple TradeRunContext objects can exist, with traderuns and selected_idx remaining as globals.
 """
@@ -107,18 +112,8 @@ mutable struct TradeRunContext
 	# Provider mapping
 	provname2provctrl::Dict{Symbol, TradeProviderControl}  # Quick lookup for providers
 	
-	# Trade summary for navigation
-	summary::Union{Nothing, TradeRunSummary}  # Current summary data
-	
-	# Trade navigation state
-	curtradectrl::Union{Nothing, TradeProviderControl}  # Currently selected trade control
-	curtradeidx::Int                                    # Index of current trade
-	curdate::Union{Nothing, UnixDate}                  # Current date being viewed
-	curbday::Union{Nothing, AbstractDataFrame}         # Cache for current business day
-	
 	function TradeRunContext(run_name::Symbol, r::sg.TradeRun, provctrls::Vector{TradeProviderControl})
 		info = TradeRunInfo(Dates.now(), nothing, nothing, run_name, r, nothing)
-		new(info, provctrls, Dict{Symbol, TradeProviderControl}(),
-			 nothing, nothing, -1, nothing, nothing)
+		new(info, provctrls, Dict{Symbol, TradeProviderControl}())
 	end
 end
