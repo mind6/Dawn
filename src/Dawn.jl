@@ -33,7 +33,7 @@ selected_idx::Int = 0
 include("runcontrol.jl")
 include("accessors.jl")
 include("snapshots.jl")
-include("tradesummary_creation.jl")
-include("tradesummary_navigation.jl")
+include("tradesummary.jl")
+include("tradeselection.jl")
 
 end
