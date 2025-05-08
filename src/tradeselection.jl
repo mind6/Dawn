@@ -132,9 +132,9 @@ function nextday!(summary::TradeRunSummary, offset::Int=1)
 	bm1 = provsummary.combineddata
 	
 	if offset > 0
-		ind = searchsortedfirst(bm1.dateordinal, summary.curdate) + offset
-	else
 		ind = searchsortedlast(bm1.dateordinal, summary.curdate) + offset
+	else
+		ind = searchsortedfirst(bm1.dateordinal, summary.curdate) + offset
 	end
 	
 	summary.curdate = bm1.dateordinal[ind]
