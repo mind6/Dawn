@@ -4,6 +4,7 @@ Summarization data for a single trade provider
 """
 struct TradeProviderSummary
 	providername::Symbol
+	refchart_colnames::Vector{Symbol}
 	combineddata::DataFrame  #all data from the runchain, including reference data
 	trades::DataFrame        #filtered combineddata to include only trades
 	exitres::DataFrame       #melted trades dataframe with rows corresponding to tradeactions like enter, exit, etc.
@@ -21,14 +22,14 @@ mutable struct TradeRunSummary
 	# Trade analysis and summaries
 	summaries_excluded::Union{Nothing, DateTime}  #last_snapshot_time of trades that were excluded from the summary
 	tradesummary::AbstractDataFrame               # all trades
-	tradesummary_gb::GroupedDataFrame            # grouped by :provider
+	tradesummary_byprov::GroupedDataFrame            # grouped by :provider
 	
 	monthsummary::AbstractDataFrame              # return per month per provider
-	monthsummary_gb::GroupedDataFrame            # grouped by :provider
+	monthsummary_byprov::GroupedDataFrame            # grouped by :provider
 	monthsummary_combined::AbstractDataFrame     # return per month summing all providers
 	
 	# Trade navigation state (for browsing in remote process)
-	curtradectrl_name::Union{Nothing, Symbol}    # Currently selected trade provider name
+	curtradeprov_name::Union{Nothing, Symbol}    # Currently selected trade provider name
 	curtradeidx::Int                             # Index of current trade
 	curdate::Union{Nothing, UnixDate}           # Current date being viewed
 	curbday::Union{Nothing, AbstractDataFrame}  # Cache for current business day
@@ -114,6 +115,10 @@ mutable struct TradeRunContext
 	
 	function TradeRunContext(run_name::Symbol, r::sg.TradeRun, provctrls::Vector{TradeProviderControl})
 		info = TradeRunInfo(Dates.now(), nothing, nothing, run_name, r, nothing)
-		new(info, provctrls, Dict{Symbol, TradeProviderControl}())
+		provname2provctrl = Dict{Symbol, TradeProviderControl}()
+		for provctrl in provctrls
+			provname2provctrl[provctrl.providername] = provctrl
+		end
+		new(info, provctrls, provname2provctrl)
 	end
 end

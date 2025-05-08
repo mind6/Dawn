@@ -60,15 +60,14 @@ function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time
 			retcol => cumsum => :combined_cumret)
 		
 		# Add metadata
-		metadata!(df, "sortinoratio", MyMath.sortinoratio_annualized(df; logret_col=retcol)[1])
-		metadata!(df, "dollar_profit", mean(df[!, profit_col]))
-		metadata!(df, "log_ret", mean(df[!, retcol]))
-
+		metadata!(df, "sortinoratio", MyMath.sortinoratio_annualized(df; logret_col=retcol)[1]; style=:note)
+		metadata!(df, "dollar_profit", mean(df[!, profit_col]); style=:note)
+		metadata!(df, "log_ret", mean(df[!, retcol]); style=:note)
 		df
 	end
 
 	### create the grouped trade summary dataframe
-	tradesummary_gb = let gdf = groupby(tradesummary, :provider)
+	tradesummary_byprov = let gdf = groupby(tradesummary, :provider)
 		# Validate grouped trades
 		for grp in gdf
 			if !issorted(grp.datetime)
@@ -83,7 +82,7 @@ function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time
 	end
 	
 	# Create monthly summaries
-	monthsummary, monthsummary_gb, monthsummary_combined = create_monthly_summaries(tradesummary, retcol)
+	monthsummary, monthsummary_byprov, monthsummary_combined = create_monthly_summaries(tradesummary, retcol)
 	
 	# Return the complete summary with initialized navigation state
 	return TradeRunSummary(
@@ -91,9 +90,9 @@ function summarizetrades(;strategy_prefix::Symbol=:delayed60, last_snapshot_time
 		provname2summary,
 		last_snapshot_time,
 		tradesummary,
-		tradesummary_gb,
+		tradesummary_byprov,
 		monthsummary,
-		monthsummary_gb,
+		monthsummary_byprov,
 		monthsummary_combined,
 		nothing,  # curtradectrl_name
 		0,        # curtradeidx
@@ -122,16 +121,16 @@ function create_monthly_summaries(tradesummary::AbstractDataFrame, retcol::Symbo
 	# Monthly returns by provider
 	gb = groupby(tradesummary, [:provider, :month])
 	df = combine(gb, retcol => sum => :prov_mo_ret)
-	monthsummary_gb = groupby(df, :provider)
-	monthsummary = transform!(monthsummary_gb, :prov_mo_ret => cumsum => :prov_cum_mo_ret)
+	monthsummary_byprov = groupby(df, :provider)
+	monthsummary = transform!(monthsummary_byprov, :prov_mo_ret => cumsum => :prov_cum_mo_ret)
 	
 	# Monthly returns combined across all providers
 	df = combine(groupby(monthsummary, :month), :prov_mo_ret => sum => :combined_mo_ret)
 	transform!(df, :combined_mo_ret => cumsum => :combined_cum_mo_ret)
 	monthsummary_combined = df
-	metadata!(monthsummary_combined, "sortinoratio", MyMath.sortinoratio_annualized(df; datetime_col=:month, logret_col=:combined_mo_ret)[1])
+	metadata!(monthsummary_combined, "sortinoratio", MyMath.sortinoratio_annualized(df; datetime_col=:month, logret_col=:combined_mo_ret)[1]; style=:note)
 	
-	return (monthsummary, monthsummary_gb, monthsummary_combined)
+	return (monthsummary, monthsummary_byprov, monthsummary_combined)
 end
 
 """
@@ -193,6 +192,7 @@ function summarize_provider_trades(provctrl::TradeProviderControl, strategy_pref
 	
 	return TradeProviderSummary(
 		provctrl.providername,
+		get_reference_columnnames(provctrl.refchartsinks...),
 		combineddata,
 		trades,
 		exitres,

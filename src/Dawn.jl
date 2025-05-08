@@ -6,7 +6,7 @@ In TAOF (Trading App Of the Future), account handling may be mirrored in separat
 """
 
 module Dawn
-export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, snapshot_summaries
+export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, snapshot_summaries, TradeRunSummary, TradeProviderSummary
 
 # External dependencies
 using  Dates, DataFrames, Infiltrator, Statistics, Distributed, ProgressMeter
