@@ -94,6 +94,7 @@ mutable struct TradeRunInfo
 	run_name::Symbol
 	r::sg.TradeRun
 	runtsks::Union{Nothing, Vector{Task}}  #we must wait for the tasks to complete before summarizing trades. Note that @sync is not designed for this because it only handles *lexically* enclosed @spawns
+	prog::Union{Nothing, ProgressMeter.AbstractProgress}
 end
 
 ################################################################################
@@ -114,7 +115,7 @@ mutable struct TradeRunContext
 	provname2provctrl::Dict{Symbol, TradeProviderControl}  # Quick lookup for providers
 	
 	function TradeRunContext(run_name::Symbol, r::sg.TradeRun, provctrls::Vector{TradeProviderControl})
-		info = TradeRunInfo(Dates.now(), nothing, nothing, run_name, r, nothing)
+		info = TradeRunInfo(Dates.now(), nothing, nothing, run_name, r, nothing, nothing)
 		provname2provctrl = Dict{Symbol, TradeProviderControl}()
 		for provctrl in provctrls
 			provname2provctrl[provctrl.providername] = provctrl

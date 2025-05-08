@@ -50,8 +50,8 @@ function executetraderun(saveproviders::Bool=true)
 		return
 	end
 	truncontext.info.timeexecuted = Dates.now()
-
-	sg.run!(truncontext.info.r, saveproviders) 
+	truncontext.info.prog = ProgressMeter.ProgressUnknown(;desc="Stepping through providers:", showspeed=true) #NOTE: leaving 'dt' at default of 0.1 helps the progress bar display correctly; a larger value may cause missing or lagging progress updates. An insufficent frequency of calls to next!() may also cause the progress bar to display incorrectly.
+	sg.run!(truncontext.info.r, saveproviders; prog=truncontext.info.prog) 
 	truncontext.info.runtsks = copy(sg.runtsks)
 end
 
@@ -60,6 +60,7 @@ function wait4traderun(truncontext::TradeRunContext=currenttraderun())
 		wait(tsk)
 	end
 	truncontext.info.timecompleted = Dates.now()
+	ProgressMeter.finish!(truncontext.info.prog) #Calling finish allows other ProgressMeters to be displayed. This must be called after run tasks complete, or the progress bar will not be displayed
 end
 
 "Delete all traderuns"
