@@ -9,7 +9,7 @@ module Dawn
 export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, snapshot_summaries, TradeRunSummary, TradeProviderSummary
 
 # External dependencies
-using  Dates, DataFrames, Infiltrator, Statistics, Distributed, ProgressMeter
+using  Dates, DataFrames, Infiltrator, Statistics, Distributed, ProgressMeter, RPC
 
 # Project dependencies
 using Inherit, MyFormats, MyMath, MyData
@@ -35,5 +35,21 @@ include("accessors.jl")
 include("snapshots.jl")
 include("tradesummary.jl")
 include("tradeselection.jl")
+
+const RPC_PORT = 8083
+
+
+@postinit function __myinit__()
+	if !Inherit.isprecompiling()
+		RPCServer.start_server("127.0.0.1", RPC_PORT)
+
+		#=
+		Exports must be registered on runtime instance of RPCServer. This means we must do it in the module init function. If we registered in the module global scope, it would be registered on the precompiled module, not the runtime instance.
+
+		The reason registration is needed is because the RPCServer cannot know about every module containing functions that might be called. Such functions need to be registered with the RPCServer.
+		=#
+		RPCServer.@rpc_export snapshot_summaries
+	end
+end
 
 end
