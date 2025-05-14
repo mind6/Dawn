@@ -1,18 +1,57 @@
 """
-Briefly acquires semaphore locks on all stream providers.
-Returns TradeRunSummary for the snapshot data.
+Optimized snapshot implementation that minimizes data transfer over RPC
+Only sends raw combineddata and metadata, with all processing done client-side
 """
-function snapshot_summaries(last_snapshot_time::Union{Nothing, DateTime})::TradeRunSummary
-	ctx = currenttraderun()
-	try
-		lock_context(ctx)
 
-		summary = summarizetrades(;last_snapshot_time=last_snapshot_time)
-		
-		return summary
-	finally
-		unlock_context(ctx)
-	end
+"""
+Server-side function that returns minimal data for RPC transfer
+"""
+function snapshot_summaries(last_snapshot_time::Union{Nothing, DateTime})::TradeRunSnapshot
+    ctx = currenttraderun()
+    try
+        lock_context(ctx)
+        
+        # Extract minimal data needed for client-side processing
+        provider_data = []
+        strategy_prefix = :delayed60  # This should come from detect_strategy_prefix(ctx, :delayed60)
+        
+        for provctrl in ctx.trprov_ctrls
+            # Get the AUT from the runchain
+            AUT = provctrl.runchain[end].prov.meta[:AUT]
+            
+            # Get combined data and filter by time if needed
+            combineddata = sp.combined_provider_data([[rn.prov for rn in provctrl.runchain]; provctrl.refchartsinks])
+            
+            if last_snapshot_time !== nothing
+                start_idx = searchsortedfirst(combineddata.datetime, last_snapshot_time, lt=(<=))
+                if start_idx <= nrow(combineddata)
+                    combineddata = @view combineddata[start_idx:end, :]
+                else
+                    combineddata = @view combineddata[1:0, :]
+                end
+            end
+            
+            # Get reference columns
+            refcols = get_reference_columnnames(provctrl.refchartsinks...)
+            
+            # Store only essential data
+            push!(provider_data, (
+                providername = provctrl.providername,
+                combineddata = combineddata,
+                refchart_colnames = refcols,
+                AUT = AUT
+            ))
+        end
+        
+        return TradeRunSnapshot(
+            provider_data,
+            now(),
+            last_snapshot_time,
+            strategy_prefix
+        )
+    finally
+        unlock_context(ctx)
+    end
 end
 
 function lock_context(ctx::TradeRunContext)
