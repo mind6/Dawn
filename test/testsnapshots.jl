@@ -31,5 +31,6 @@ begin
 	wait4traderun()
 end
 
-ss = snapshot_summaries(nothing);
+ss = create_snapshot(nothing);
 
+snapsummary = summarize_snapshot(ss)

@@ -6,7 +6,7 @@ In TAOF (Trading App Of the Future), account handling may be mirrored in separat
 """
 
 module Dawn
-export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, snapshot_summaries, TradeRunSummary, TradeProviderSummary, TradeRunSnapshot
+export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, create_snapshot, summarize_snapshot, TradeRunSummary, TradeProviderSummary, TradeRunSnapshot
 
 # External dependencies
 using  Dates, DataFrames, Infiltrator, Statistics, Distributed, ProgressMeter, RPC
@@ -18,7 +18,6 @@ import StreamProviders as sp
 import StreamProviders: Provider
 
 # Core type definitions 
-include("snapshot_types.jl")
 include("types.jl")
 
 #=
@@ -33,10 +32,11 @@ selected_idx::Int = 0
 
 include("runcontrol.jl")
 include("accessors.jl")
-include("snapshots.jl")
 include("tradesummary.jl")
 include("tradeselection.jl")
-include("snapshot_client_v2.jl")
+include("snapshot_server.jl")
+include("snapshot_client.jl")
+
 const RPC_PORT = 8083
 
 
@@ -49,7 +49,7 @@ const RPC_PORT = 8083
 
 		The reason registration is needed is because the RPCServer cannot know about every module containing functions that might be called. Such functions need to be registered with the RPCServer.
 		=#
-		RPCServer.@rpc_export snapshot_summaries
+		RPCServer.@rpc_export create_snapshot
 	end
 end
 
