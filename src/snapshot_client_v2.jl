@@ -2,13 +2,7 @@
 Client-side reconstruction of TradeRunSummary from minimal TradeRunSnapshot data
 This module should be used on the client side that receives the TradeRunSnapshot via RPC
 """
-module SnapshotClient
 
-using DataFrames, Dates, Statistics
-import MyMath, MyFormats
-
-# Import the TradeRunSnapshot type (this should match the server definition)
-include("snapshot_types.jl")
 
 """
 Client-side function to reconstruct TradeRunSummary from TradeRunSnapshot
@@ -161,4 +155,3 @@ function process_snapshot(snapshot::TradeRunSnapshot;
                                            sp)
 end
 
-end # module

@@ -1,8 +1,14 @@
 using Test, Dawn, DataFrames, Dates, Statistics
-include("snapshot_types.jl")
-include("snapshot_client_v2.jl")
+using MyBase, Dates
+import Strategies2: path_a, PlanNodeSpec, RunSpec, HistoricalRun, DateInterval
 
-@testset "Optimized Snapshot System" begin
+test_plan = PlanNodeSpec[
+	@namevaluepair(path_a) => ["SPY"] =>["VXX"]
+]
+
+test_run::RunSpec = HistoricalRun(test_plan, DateInterval(Date(2019, 8, 1), Date(2019, 9,1)))
+
+@testset verbose=true "Optimized Snapshot System" begin
     
     @testset "TradeRunSnapshot serialization" begin
         # Create a minimal snapshot
@@ -26,7 +32,7 @@ include("snapshot_client_v2.jl")
     @testset "Client-side reconstruction" begin
         # Run a trade run to get real data
         deletetraderuns()
-        createtraderun(:test_run, true)
+        createtraderun(@namevaluepair(test_run)..., true)
         executetraderun()
         wait4traderun()
         
@@ -44,7 +50,7 @@ include("snapshot_client_v2.jl")
         @test :close in propertynames(prov_data.combineddata)
         
         # Reconstruct on client side
-        reconstructed = SnapshotClient.reconstruct_summary_from_snapshot(
+        reconstructed = Dawn.reconstruct_summary_from_snapshot(
             snapshot,
             Dawn.TradeProviderSummary,
             Dawn.TradeRunSummary, 
@@ -67,44 +73,13 @@ include("snapshot_client_v2.jl")
         prov_summary = first(reconstructed.provider_summaries)
         @test !isempty(prov_summary.combineddata)
         @test prov_summary.combineddata === first(snapshot.provider_data).combineddata
-    end
-    
-    @testset "Support for get_twodays_bm1" begin
-        # Create sample data that get_twodays_bm1 would need
-        test_date = DateTime("2022-01-21T15:08:00")
-        test_data = DataFrame(
-            datetime = [test_date - Hour(1), test_date, test_date + Hour(1)],
-            close = [100.0, 101.0, 102.0],
-            VIX_close = [20.0, 21.0, 22.0],
-            SPY_close = [400.0, 401.0, 402.0]
-        )
-        
-        snapshot = TradeRunSnapshot(
-            [(providername=:path_a2!BA,
-              combineddata=test_data,
-              refchart_colnames=[:VIX_close, :SPY_close],
-              AUT="BA")],
-            now(),
-            nothing,
-            :delayed60
-        )
-        
-        # Reconstruct summary
-        reconstructed = SnapshotClient.reconstruct_summary_from_snapshot(
-            snapshot,
-            Dawn.TradeProviderSummary,
-            Dawn.TradeRunSummary,
-            Dawn.create_monthly_summaries,
-            Dawn.sp
-        )
-        
+
         # Verify provider summary has data needed for get_twodays_bm1
-        prov_summary = reconstructed.provname2summary[:path_a2!BA]
+        prov_summary = reconstructed.provname2summary[:path_a!VXX]
         @test !isempty(prov_summary.combineddata)
-        @test :VIX_close in propertynames(prov_summary.combineddata)
         @test :SPY_close in propertynames(prov_summary.combineddata)
     end
-    
+        
     @testset "Performance comparison" begin
         # Get real data
         original_summary = summarizetrades()

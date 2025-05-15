@@ -6,7 +6,7 @@ In TAOF (Trading App Of the Future), account handling may be mirrored in separat
 """
 
 module Dawn
-export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, snapshot_summaries, TradeRunSummary, TradeProviderSummary
+export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, snapshot_summaries, TradeRunSummary, TradeProviderSummary, TradeRunSnapshot
 
 # External dependencies
 using  Dates, DataFrames, Infiltrator, Statistics, Distributed, ProgressMeter, RPC
@@ -18,6 +18,7 @@ import StreamProviders as sp
 import StreamProviders: Provider
 
 # Core type definitions 
+include("snapshot_types.jl")
 include("types.jl")
 
 #=
@@ -35,7 +36,7 @@ include("accessors.jl")
 include("snapshots.jl")
 include("tradesummary.jl")
 include("tradeselection.jl")
-
+include("snapshot_client_v2.jl")
 const RPC_PORT = 8083
 
 

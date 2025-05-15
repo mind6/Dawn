@@ -1,11 +1,4 @@
 """
-Minimal type definitions for snapshot data transfer
-These types should be used by both server and client to ensure compatibility
-"""
-
-using DataFrames, Dates
-
-"""
 Minimal snapshot data structure for efficient RPC transfer
 Contains only raw combineddata and metadata needed to reconstruct TradeRunSummary on client side
 """
@@ -22,4 +15,3 @@ struct TradeRunSnapshot
     strategy_prefix::Symbol
 end
 
-export TradeRunSnapshot

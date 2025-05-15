@@ -30,7 +30,9 @@ function snapshot_summaries(last_snapshot_time::Union{Nothing, DateTime})::Trade
                     combineddata = @view combineddata[1:0, :]
                 end
             end
-            
+            metadata!(combineddata, "symbol", AUT; style=:note)
+            MyData.setcolumn_asindex!(combineddata, :datetime)            
+				
             # Get reference columns
             refcols = get_reference_columnnames(provctrl.refchartsinks...)
             
