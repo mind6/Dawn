@@ -20,7 +20,7 @@ test_run::RunSpec = HistoricalRun(test_plan, DateInterval(Date(2019, 8, 1), Date
 begin
 	deletetraderuns()
 
-	createtraderun(@namevaluepair(test_run)..., false; ignore_cache=Type{<:Provider}[BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
+	createtraderun(@namevaluepair(test_run)..., true; ignore_cache=Type{<:Provider}[BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
 end
 
 begin
@@ -30,8 +30,17 @@ begin
 
 	wait4traderun()
 end
+begin
+	Dawn.RPCClient.disconnect()
+	Dawn.RPCServer.stop_server()
+	wait(Threads.@spawn Dawn.RPCServer.start_server(port=8081))
+	# Dawn.RPCServer.start_server(port=8081)
+	Dawn.RPCClient.connect(port=8081)
+	Dawn.RPCClient.@rpc_import create_snapshot
 
-ss = create_snapshot(nothing);
+end
+
+@time ss = remote_create_snapshot(nothing);
 
 snapsummary = summarize_snapshot(ss);
 

@@ -37,12 +37,8 @@ include("tradeselection.jl")
 include("snapshot_server.jl")
 include("snapshot_client.jl")
 
-const RPC_PORT = 8083
-
-
 @postinit function __myinit__()
 	if !Inherit.isprecompiling()
-		RPCServer.start_server("127.0.0.1", RPC_PORT)
 
 		#=
 		Exports must be registered on runtime instance of RPCServer. This means we must do it in the module init function. If we registered in the module global scope, it would be registered on the precompiled module, not the runtime instance.

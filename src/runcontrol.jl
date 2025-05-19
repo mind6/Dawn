@@ -70,7 +70,7 @@ function deletetraderuns()
 end
 
 """
-If changing index, this calls 'summarizetrades()' if run has been executed.
+Changes the trade run returned by currenttraderun().
 """
 function selecttraderun(idx::Int)
 	if idx == selected_idx return end
@@ -78,11 +78,6 @@ function selecttraderun(idx::Int)
 	n = length(traderuns)
 	if idx in 1:n 
 		global selected_idx = idx
-		truncontext = currenttraderun()
-		if truncontext.info.timeexecuted !== nothing
-			@info "resummarizing trades..."
-			summarizetrades()
-		end
 		@info "selected $selected_idx of $n traderuns."
 	else
 		@error "cannot select $idx out of $n traderuns"
