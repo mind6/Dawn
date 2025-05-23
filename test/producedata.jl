@@ -23,18 +23,8 @@ begin
 	wait4traderun()
 end
 
-summarizetrades();
 
-# begin
-# 	using ProgressMeter
-# 	prog = ProgressUnknown(desc="Titles read:")
-# 	Threads.@threads for i in 1:5
-# 		for k in 1:15
-# 			next!(prog; showvalues=[(:i, i), (:k, k)])
-# 			sleep(1)
-# 		end
-# 		#  @show i
-# 	end
-# 	finish!(prog)
-# end
-
+begin
+	Dawn.RPCServer.stop_server()
+	wait(Threads.@spawn Dawn.RPCServer.start_server(port=8081))
+end
