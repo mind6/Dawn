@@ -14,7 +14,7 @@ begin
 	deletetraderuns()
 
 	# createtraderun(:run_a3_1, true)
-	createtraderun(:run_a3_1, true; ignore_cache=Type{<:Provider}[BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
+	createtraderun(:run_a3_1, true; ignore_cache=Type{<:Provider}[PrevDayMinuteBarProvider, BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
 
 	executetraderun()
 

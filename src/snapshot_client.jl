@@ -13,6 +13,9 @@ function summarize_snapshot(snapshot::TradeRunSnapshot)::TradeRunSummary
 	
 	# Process each provider's data
 	for prov_data in snapshot.provider_data
+		# convert from a format fast to serialize to the original format
+		unhidemissings!(prov_data.combineddata)
+
 		# Extract trades from combineddata
 		trades = filter(:exitstrat_onenter => !ismissing, prov_data.combineddata)
 		

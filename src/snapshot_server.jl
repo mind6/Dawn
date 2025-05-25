@@ -36,6 +36,9 @@ function create_snapshot(last_snapshot_time::Union{Nothing, DateTime})::TradeRun
 				# Get reference columns
 				refcols = get_reference_columnnames(provctrl.refchartsinks...)
 				
+				# convert to a format fast to serialize
+				hidemissings!(combineddata)
+
 				# Store only essential data
 				push!(provider_data, (
 					 providername = provctrl.providername,

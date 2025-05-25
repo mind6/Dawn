@@ -12,7 +12,7 @@ export createtraderun, executetraderun, summarizetrades, deletetraderuns, select
 using  Dates, DataFrames, Infiltrator, Statistics, Distributed, ProgressMeter, RPC
 
 # Project dependencies
-using Inherit, MyFormats, MyMath, MyData
+using Inherit, MyFormats, MyMath, MyData, MyBase
 import Strategies2 as sg
 import StreamProviders as sp
 import StreamProviders: Provider
