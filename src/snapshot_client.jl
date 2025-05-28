@@ -5,6 +5,31 @@ This module should be used on the client side that receives the TradeRunSnapshot
 
 
 """
+Creates a detailed trading summary for a specific two-day period with complete signal history.
+
+This function runs a targeted historical backtest with verbose=true specifically for the 
+currently selected date range. The verbose flag captures all intermediate calculations
+and signal data that would be memory-prohibitive to store for an entire backtest.
+
+The result is a TradeRunSummary containing detailed minute-by-minute trading signals,
+enabling deep analysis of specific trading events without the memory overhead of
+keeping verbose data for the entire trading history.
+"""
+
+function get_twodays_verbose_summary(summary::TradeRunSummary; localtraderun::Bool=false)::TradeRunSummary
+	@assert getcurrentdateid(summary) !== nothing
+
+	bm1_2day = Dawn.get_twodays_bm1(summary)
+	startdate = bm1_2day[1,:dateordinal]
+	enddate = bm1_2day[end,:dateordinal] + 1
+	provider_name = Dawn.getcurrentprovider(summary)
+
+	f = localtraderun ? create_verbose_snapshot : remote_create_verbose_snapshot
+	verbose_snapshot = f(summary.source_snapshot.traderun_idx, provider_name, startdate, enddate)
+	summarize_snapshot(verbose_snapshot)
+end
+
+"""
 Client-side function to reconstruct TradeRunSummary from TradeRunSnapshot
 """
 function summarize_snapshot(snapshot::TradeRunSnapshot)::TradeRunSummary
@@ -124,9 +149,9 @@ function summarize_snapshot(snapshot::TradeRunSnapshot)::TradeRunSummary
 	end
 	
 	return TradeRunSummary(
+		snapshot,
 		provider_summaries,
 		provname2summary,
-		snapshot.last_snapshot_time,
 		tradesummary,
 		tradesummary_byprov,
 		monthsummary,

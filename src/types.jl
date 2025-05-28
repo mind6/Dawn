@@ -4,13 +4,17 @@ Minimal snapshot data structure for efficient RPC transfer
 Contains only raw combineddata and metadata needed to reconstruct TradeRunSummary on client side
 """
 struct TradeRunSnapshot
+	traderun_idx::Union{Nothing, Int}  #index of the traderun in the global traderuns array. May be set to nothing if a request is made to free the trade run associated with this snapshot.
+
 	# Raw combined data for each provider 
 	provider_data::Vector{NamedTuple{(:providername, :combineddata, :refchart_colnames, :AUT), 
 								   Tuple{Symbol, DataFrame, Vector{Symbol}, String}}}
 	
 	# Snapshot timing information 
 	snapshot_time::DateTime
-	last_snapshot_time::Union{Nothing, DateTime}
+
+	#last_snapshot_time of trades that were excluded from the summary; data up to and including this time is excluded from snapshot and summary.
+	data_excluded::Union{Nothing, DateTime}
 	
 	# Strategy prefix detected on server
 	strategy_prefix::Symbol
@@ -35,11 +39,12 @@ end
 Complete summarization results for a trade run with navigation state
 """
 mutable struct TradeRunSummary
+	source_snapshot::TradeRunSnapshot	#snapshot that was used to generate this summary. This contains useful information like traderun_idx and data_excluded, which are not present in the summary itself.
+
 	provider_summaries::Vector{TradeProviderSummary}
 	provname2summary::Dict{Symbol, TradeProviderSummary}
 	
 	# Trade analysis and summaries
-	summaries_excluded::Union{Nothing, DateTime}  #last_snapshot_time of trades that were excluded from the summary
 	tradesummary::AbstractDataFrame               # all trades
 	tradesummary_byprov::GroupedDataFrame            # grouped by :provider
 	

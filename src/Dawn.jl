@@ -46,6 +46,7 @@ include("snapshot_client.jl")
 		The reason registration is needed is because the RPCServer cannot know about every module containing functions that might be called. Such functions need to be registered with the RPCServer.
 		=#
 		RPCServer.@rpc_export create_snapshot
+		RPCServer.@rpc_export create_verbose_snapshot
 	end
 end
 
