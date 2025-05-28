@@ -47,6 +47,10 @@ function getcurrentprovider(summary::TradeRunSummary)
 	summary.curtradeprov_name
 end
 
+function getcurrentpathname(summary::TradeRunSummary)::Symbol
+	Symbol(split(String(summary.curtradeprov_name), '!')[1])
+end
+
 function getcurrentprovsummary(summary::TradeRunSummary)
 	if summary.curtradeprov_name === nothing
 		return nothing
