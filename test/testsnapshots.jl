@@ -1,7 +1,7 @@
 #=
 Debug specific trades or dates.
 =#
-using TerminalPager, Statistics, Serialization, DataFrames
+using TerminalPager, Statistics, Serialization, DataFrames, Test
 using Revise, Dawn, MyBase, Dates, MyData
 using StreamProviders
 import StreamProviders as sp
@@ -33,17 +33,25 @@ end
 begin
 	Dawn.RPCClient.disconnect()
 	Dawn.RPCServer.stop_server()
-	wait(Threads.@spawn Dawn.RPCServer.start_server(port=8081))
+	wait(Threads.@spawn Dawn.RPCServer.start_server(port=8085))
 	
-	Dawn.RPCClient.connect(port=8081)
+	Dawn.RPCClient.connect(port=8085)
 	Dawn.RPCClient.@rpc_import create_snapshot
 
 end
 
 @time ss = remote_create_snapshot(nothing);
 
-snapsummary = summarize_snapshot(ss);
+snapsma = summarize_snapshot(ss);
 
+begin
+	Dawn.selectprovider!(snapsma, :path_a!VXX)
+	Dawn.getcurrenttradeid(snapsma)
+	d1 = Dawn.getcurrentdateid(snapsma)
+	Dawn.nextday!(snapsma)
+	d2 = Dawn.getcurrentdateid(snapsma)
+	@test d1 != d2
+end
 
 #=
 This code is a testing and profiling section that:
