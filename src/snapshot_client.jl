@@ -15,7 +15,6 @@ The result is a TradeRunSummary containing detailed minute-by-minute trading sig
 enabling deep analysis of specific trading events without the memory overhead of
 keeping verbose data for the entire trading history.
 """
-
 function get_twodays_verbose_summary(summary::TradeRunSummary; localtraderun::Bool=false)::TradeRunSummary
 	@assert getcurrentdateid(summary) !== nothing
 
@@ -106,28 +105,30 @@ function summarize_snapshot(snapshot::TradeRunSnapshot)::TradeRunSummary
 	all_exitres = [summary.exitres for summary in provider_summaries]
 	
 	# Create merged trade summary
-	tradesummary = if !isempty(all_exitres)
-		df = vcat(all_exitres...; cols=:union)
-		sort!(df, :datetime)
-		
-		# Add month column and cumulative metrics
-		df.month = Dates.floor.(df.datetime, Dates.Month)
-		transform!(df, retcol => cumsum => :combined_cumret)
-		
-		# Add metadata if calculations are possible
-		if !isempty(df) && retcol in propertynames(df) && profit_col in propertynames(df)
-			if !all(ismissing, df[!, retcol])
-				sortino_val = MyMath.sortinoratio_annualized(df; logret_col=retcol)
-				if !isempty(sortino_val)
-					metadata!(df, "sortinoratio", sortino_val[1]; style=:note)
+	tradesummary = let df = DataFrame()
+		if !isempty(all_exitres)
+			df = vcat(all_exitres...; cols=:union)
+			if !isempty(df)
+				sort!(df, :datetime)
+				
+				# Add month column and cumulative metrics
+				df.month = Dates.floor.(df.datetime, Dates.Month)
+				transform!(df, retcol => cumsum => :combined_cumret)
+				
+				# Add metadata if calculations are possible
+				if !isempty(df) && retcol in propertynames(df) && profit_col in propertynames(df)
+					if !all(ismissing, df[!, retcol])
+						sortino_val = MyMath.sortinoratio_annualized(df; logret_col=retcol)
+						if !isempty(sortino_val)
+							metadata!(df, "sortinoratio", sortino_val[1]; style=:note)
+						end
+					end
+					metadata!(df, "dollar_profit", mean(skipmissing(df[!, profit_col])); style=:note)
+					metadata!(df, "log_ret", mean(skipmissing(df[!, retcol])); style=:note)
 				end
 			end
-			metadata!(df, "dollar_profit", mean(skipmissing(df[!, profit_col])); style=:note)
-			metadata!(df, "log_ret", mean(skipmissing(df[!, retcol])); style=:note)
 		end
 		df
-	else
-		DataFrame()
 	end
 	
 	# Create grouped summaries

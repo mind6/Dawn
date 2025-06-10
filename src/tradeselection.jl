@@ -25,7 +25,7 @@ function selectprovider!(summary::TradeRunSummary, provname::Symbol)
 	provsummary = getcurrentprovsummary(summary)
 	if isempty(provsummary.trades)
 		summary.curtradeidx = 0
-		summary.curdate = nothing
+		summary.curdate = provsummary.combineddata.dateordinal[1]
 		return (provname, nothing)
 	else
 		summary.curtradeidx = 1
@@ -35,46 +35,47 @@ function selectprovider!(summary::TradeRunSummary, provname::Symbol)
 end
 
 """
-Select a trade for navigation in the summary.
+Select a trade for navigation. Validates inputs before making any state changes.
 
-# Arguments
-- `summary`: The TradeRunSummary to navigate
-- `timeoftrade`: Optional DateTime to select a specific trade, default is the first trade
-- `provname`: Optional Symbol to select a specific provider, default is the first provider
-
-# Returns
-Tuple of (provider_name, trade_datetime)
+Returns: (provider_name, trade_datetime)
 """
 function selecttrade!(summary::TradeRunSummary, timeoftrade::Union{Nothing, DateTime}=nothing; 
                       provname::Union{Nothing, Symbol}=nothing)
-	# Set the current provider
-	if provname !== nothing
-		summary.curtradeprov_name = provname
-	elseif summary.curtradeprov_name === nothing && !isempty(summary.provider_summaries)
-		summary.curtradeprov_name = summary.provider_summaries[1].providername
-	end
+	# Determine target provider
+	target_prov = provname !== nothing ? provname : 
+	              (summary.curtradeprov_name !== nothing ? summary.curtradeprov_name :
+	               (!isempty(summary.provider_summaries) ? summary.provider_summaries[1].providername : nothing))
 	
-	if summary.curtradeprov_name === nothing
+	if target_prov === nothing
 		error("No provider selected or available")
 	end
 	
-	# Get the provider summary
-	if !haskey(summary.provname2summary, summary.curtradeprov_name)
-		error("No summary found for provider $(summary.curtradeprov_name)")
+	# Validate provider exists
+	if !haskey(summary.provname2summary, target_prov)
+		error("Provider $(target_prov) not found in summary")
 	end
-	provsummary = summary.provname2summary[summary.curtradeprov_name]
 	
+	provsummary = summary.provname2summary[target_prov]
 	if isempty(provsummary.trades)
-		error("No trades found for provider $(summary.curtradeprov_name)")
+		error("No trades found for provider $(target_prov)")
 	end
 	
-	# Set the trade index
-	summary.curtradeidx = timeoftrade === nothing ? 1 : MyData.getloc(provsummary.trades, timeoftrade)
+	# Determine target trade index
+	target_idx = 1
+	if timeoftrade !== nothing
+		try
+			target_idx = MyData.getloc(provsummary.trades, timeoftrade)
+		catch e
+			error("Failed to locate trade at $(timeoftrade) for provider $(target_prov): $(e)")
+		end
+	end
 	
-	# Set the date
-	summary.curdate = provsummary.trades[summary.curtradeidx, :dateordinal]
+	# All validations passed - update state
+	summary.curtradeprov_name = target_prov
+	summary.curtradeidx = target_idx
+	summary.curdate = provsummary.trades[target_idx, :dateordinal]
 	
-	return (summary.curtradeprov_name, provsummary.trades[summary.curtradeidx, :datetime])
+	return (target_prov, provsummary.trades[target_idx, :datetime])
 end
 
 """
@@ -114,7 +115,7 @@ function prevtrade!(summary::TradeRunSummary)
 end
 
 """
-Navigate to next/previous day.
+Navigate to next/previous day (cycles around).
 
 # Arguments
 - `summary`: The TradeRunSummary to navigate
@@ -137,14 +138,10 @@ function nextday!(summary::TradeRunSummary, offset::Int=1)
 		ind = searchsortedfirst(bm1.dateordinal, summary.curdate) + offset
 	end
 	
-	summary.curdate = bm1.dateordinal[ind]
+	# Cycle around if out of bounds
+	ind = MyMath.modind(ind, length(bm1.dateordinal))
 	
-	# Try to sync to a trade on this day
-	dft = provsummary.trades
-	trade_ind = searchsortedfirst(dft.dateordinal, summary.curdate)
-	if trade_ind ∈ 1:nrow(dft) && dft.dateordinal[trade_ind] == summary.curdate
-		summary.curtradeidx = trade_ind
-	end
+	summary.curdate = bm1.dateordinal[ind]
 	
 	return (summary.curtradeprov_name, summary.curdate)
 end
@@ -157,5 +154,78 @@ Tuple of (provider_name, day)
 """
 function prevday!(summary::TradeRunSummary)
 	nextday!(summary, -1)
+end
+
+"""
+Navigate to the first day with data.
+
+# Returns
+Tuple of (provider_name, day)
+"""
+function firstday!(summary::TradeRunSummary)
+	if summary.curtradeprov_name === nothing
+		error("No provider selected. Call selecttrade! first")
+	end
+	
+	provsummary = getcurrentprovsummary(summary)
+	bm1 = provsummary.combineddata
+	
+	if isempty(bm1.dateordinal)
+		error("No data available for provider $(summary.curtradeprov_name)")
+	end
+	
+	summary.curdate = bm1.dateordinal[1]
+	
+	return (summary.curtradeprov_name, summary.curdate)
+end
+
+"""
+Navigate to the last day with data.
+
+# Returns
+Tuple of (provider_name, day)
+"""
+function lastday!(summary::TradeRunSummary)
+	if summary.curtradeprov_name === nothing
+		error("No provider selected. Call selecttrade! first")
+	end
+	
+	provsummary = getcurrentprovsummary(summary)
+	bm1 = provsummary.combineddata
+	
+	if isempty(bm1.dateordinal)
+		error("No data available for provider $(summary.curtradeprov_name)")
+	end
+	
+	summary.curdate = bm1.dateordinal[end]
+	
+	return (summary.curtradeprov_name, summary.curdate)
+end
+
+"""
+Set the selected trade to the first trade of the current day if one exists.
+
+# Returns
+Tuple of (provider_name, trade_datetime) or (provider_name, nothing) if no trade found
+"""
+function synctradetoday!(summary::TradeRunSummary)
+	if summary.curtradeprov_name === nothing || summary.curdate === nothing
+		error("No provider or date selected. Call selecttrade! first")
+	end
+	
+	provsummary = getcurrentprovsummary(summary)
+	dft = provsummary.trades
+	
+	if isempty(dft)
+		return (summary.curtradeprov_name, nothing)
+	end
+	
+	trade_ind = searchsortedfirst(dft.dateordinal, summary.curdate)
+	if trade_ind ∈ 1:nrow(dft) && dft.dateordinal[trade_ind] == summary.curdate
+		summary.curtradeidx = trade_ind
+		return (summary.curtradeprov_name, dft.datetime[trade_ind])
+	end
+	
+	return (summary.curtradeprov_name, nothing)
 end
 

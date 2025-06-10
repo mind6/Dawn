@@ -6,7 +6,7 @@ In TAOF (Trading App Of the Future), account handling may be mirrored in separat
 """
 
 module Dawn
-export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, create_snapshot, summarize_snapshot, TradeRunSummary, TradeProviderSummary, TradeRunSnapshot
+export createtraderun, executetraderun, summarizetrades, deletetraderuns, selecttraderun, wait4traderun, currenttraderun, create_snapshot, create_verbose_snapshot, summarize_snapshot, TradeRunSummary, TradeProviderSummary, TradeRunSnapshot
 
 # External dependencies
 using  Dates, DataFrames, Infiltrator, Statistics, Distributed, ProgressMeter, RPC
@@ -36,6 +36,8 @@ include("tradesummary.jl")
 include("tradeselection.jl")
 include("snapshot_server.jl")
 include("snapshot_client.jl")
+
+RPCClient.@rpc_import create_verbose_snapshot
 
 @postinit function __myinit__()
 	if !Inherit.isprecompiling()
