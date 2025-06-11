@@ -27,7 +27,7 @@ Summarization data for a single trade provider
 """
 struct TradeProviderSummary
 	providername::Symbol
-	refchart_colnames::Vector{Symbol}
+	refchart_colnames::Vector{Symbol}  #reference data column names available in both combineddata and all derived trade summaries
 	combineddata::DataFrame  #all data from the runchain, including reference data
 	trades::DataFrame        #filtered combineddata to include only trades
 	exitres::DataFrame       #melted trades dataframe with rows corresponding to tradeactions like enter, exit, etc.
