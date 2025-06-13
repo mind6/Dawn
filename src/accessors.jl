@@ -120,7 +120,7 @@ function get_twodays_bm1(summary::TradeRunSummary)
 end
 
 """
-Get current daily bar data from summary.
+Get current daily bar data from summary, enhanced with reference symbols' close data.
 """
 function get_current_bday(summary::TradeRunSummary)
 	dateid = getcurrentdateid(summary)
@@ -131,9 +131,54 @@ function get_current_bday(summary::TradeRunSummary)
 	providername, curdate = dateid
 	symbol = split(String(providername), '!')[2]
 	
-	# Cache invalidation
-	if summary.curbday === nothing || metadata(summary.curbday, "symbol") != symbol
-		summary.curbday = MyData.AssetData(symbol).bday
+	# Find current provider's data from snapshot
+	current_prov_data = nothing
+	for prov_data in summary.source_snapshot.provider_data
+		if prov_data.providername == providername
+			current_prov_data = prov_data
+			break
+		end
+	end
+	
+	# Create cache key that includes reference symbols to detect changes
+	cache_key = if current_prov_data !== nothing
+		string(symbol, "_", hash(current_prov_data.reference_symbols))
+	else
+		symbol
+	end
+	
+	# Cache invalidation - check if symbol or reference symbols changed
+	if summary.curbday === nothing || metadata(summary.curbday, "cache_key", "") != cache_key
+		# Load main asset's daily data
+		base_bday = MyData.AssetData(symbol).bday
+		
+		# Enhance with reference data if available
+		if current_prov_data !== nothing && !isempty(current_prov_data.reference_symbols)
+			enhanced_bday = copy(base_bday)  # Start with main asset data
+			
+			# Add reference symbols' close data
+			for ref_symbol in current_prov_data.reference_symbols
+				try
+					ref_bday = MyData.AssetData(ref_symbol).bday
+					ref_close_col = Symbol(ref_symbol, "_close")
+					
+					# Join reference close data on date
+					leftjoin!(enhanced_bday, 
+						select(ref_bday, :dateordinal, :close => ref_close_col),
+						on=:dateordinal)
+				catch e
+					@warn "Failed to load reference data for $ref_symbol: $e"
+				end
+			end
+			
+			summary.curbday = enhanced_bday
+		else
+			summary.curbday = base_bday
+		end
+		
+		# Set metadata for cache management
+		metadata!(summary.curbday, "symbol", symbol; style=:note)
+		metadata!(summary.curbday, "cache_key", cache_key; style=:note)
 	end
 	
 	loc = searchsortedlast(summary.curbday.dateordinal, curdate)

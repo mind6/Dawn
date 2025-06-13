@@ -64,11 +64,16 @@ function create_snapshot(last_snapshot_time::Union{Nothing,DateTime})::TradeRunS
 			# convert to a format fast to serialize
 			hidemissings!(combineddata)
 
+			# Extract parameter metadata from providers
+			param_metadata = extract_parameter_metadata(provctrl)
+
 			# Store only essential data
 			push!(provider_data, (
 				providername=provctrl.providername,
 				combineddata=combineddata,
 				refchart_colnames=refcols,
+				reference_symbols=get_reference_symbols(provctrl.refchartsinks),
+				param_metadata=param_metadata,
 				AUT=AUT
 			))
 		end
@@ -114,4 +119,20 @@ function lock_runchain(provctrl::TradeProviderControl, lockit::Bool=true)
 			sp.release_queue(prov)
 		end
 	end
+end
+
+# Helper function to extract relevant parameters
+function extract_parameter_metadata(provctrl::TradeProviderControl)::Dict{String, Any}
+	metadata = Dict{String, Any}()
+	
+	for runnode in provctrl.runchain
+		prov = runnode.prov
+		# Check if provider has parameter with atrcol
+		if hasfield(typeof(prov), :P) && hasfield(typeof(prov.P), :atrcol)
+			metadata["atrcol"] = prov.P.atrcol
+		end
+		# Can extend for other important parameters
+	end
+	
+	return metadata
 end

@@ -7,8 +7,14 @@ struct TradeRunSnapshot
 	traderun_idx::Union{Nothing, Int}  #index of the traderun in the global traderuns array. May be set to nothing if a request is made to free the trade run associated with this snapshot.
 
 	# Raw combined data for each provider 
-	provider_data::Vector{NamedTuple{(:providername, :combineddata, :refchart_colnames, :AUT), 
-								   Tuple{Symbol, DataFrame, Vector{Symbol}, String}}}
+	provider_data::Vector{@NamedTuple{
+		providername::Symbol, 
+		combineddata::DataFrame, 
+		refchart_colnames::Vector{Symbol}, 
+		reference_symbols::Vector{String},
+		param_metadata::Dict{String, Any},
+		AUT::String
+	}}
 	
 	# Snapshot timing information 
 	snapshot_time::DateTime
@@ -56,7 +62,7 @@ mutable struct TradeRunSummary
 	curtradeprov_name::Union{Nothing, Symbol}    # Currently selected trade provider name
 	curtradeidx::Int                             # Index of current trade
 	curdate::Union{Nothing, UnixDate}           # Current date being viewed
-	curbday::Union{Nothing, AbstractDataFrame}  # Cache for current business day
+	curbday::Union{Nothing, AbstractDataFrame}  # Cache for current daily bars
 end
 
 ################################################################################
