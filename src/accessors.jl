@@ -13,14 +13,22 @@ end
 function get_reference_columnnames(refchartsinks::sp.RefChartSink...)::Vector{Symbol}
 	cols = Symbol[]
 	for refsink in refchartsinks
-		for aut in Dawn.sp.get_referencenAUTs(refsink)
+		for aut in sp.get_reference_AUTs(refsink)
 			for field in refsink.ref_fields
-				colname = Dawn.sp.get_refdata_columnname(refsink, aut, field)
+				colname = sp.get_refdata_columnname(refsink, aut, field)
 				push!(cols, colname)
 			end
 		end
 	end
 	cols
+end
+
+function get_reference_symbols(refchartsinks::sp.RefChartSink...)::Vector{AbstractString}
+	symbols = String[]
+	for refsink in refchartsinks
+		append!(symbols, sp.get_reference_AUTs(refsink))
+	end
+	symbols
 end
 
 function selectedidx() selected_idx end
@@ -152,6 +160,9 @@ function get_current_bday(summary::TradeRunSummary)
 		# Load main asset's daily data
 		base_bday = MyData.AssetData(symbol).bday
 		
+		# Collect reference column names for metadata
+		ref_close_cols = Symbol[]
+		
 		# Enhance with reference data if available
 		if current_prov_data !== nothing && !isempty(current_prov_data.reference_symbols)
 			enhanced_bday = copy(base_bday)  # Start with main asset data
@@ -160,11 +171,13 @@ function get_current_bday(summary::TradeRunSummary)
 			for ref_symbol in current_prov_data.reference_symbols
 				try
 					ref_bday = MyData.AssetData(ref_symbol).bday
-					ref_close_col = Symbol(ref_symbol, "_close")
+					fieldname = :close
+					ref_close_col = sp.get_refdata_columnname(ref_symbol, fieldname)
+					push!(ref_close_cols, ref_close_col)
 					
 					# Join reference close data on date
 					leftjoin!(enhanced_bday, 
-						select(ref_bday, :dateordinal, :close => ref_close_col),
+						select(ref_bday, :dateordinal, fieldname => ref_close_col),
 						on=:dateordinal)
 				catch e
 					@warn "Failed to load reference data for $ref_symbol: $e"
@@ -176,9 +189,18 @@ function get_current_bday(summary::TradeRunSummary)
 			summary.curbday = base_bday
 		end
 		
-		# Set metadata for cache management
+		# Get atrcol from param_metadata if available
+		atrcol = if current_prov_data !== nothing && haskey(current_prov_data.param_metadata, "atrcol")
+			Symbol(current_prov_data.param_metadata["atrcol"])
+		else
+			nothing
+		end
+		
+		# Set metadata for cache management and plotting
 		metadata!(summary.curbday, "symbol", symbol; style=:note)
 		metadata!(summary.curbday, "cache_key", cache_key; style=:note)
+		metadata!(summary.curbday, "ref_close_cols", ref_close_cols; style=:note)
+		metadata!(summary.curbday, "atrcol", atrcol; style=:note)
 	end
 	
 	loc = searchsortedlast(summary.curbday.dateordinal, curdate)

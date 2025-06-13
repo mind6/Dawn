@@ -60,6 +60,7 @@ function create_snapshot(last_snapshot_time::Union{Nothing,DateTime})::TradeRunS
 
 			# Get reference columns
 			refcols = get_reference_columnnames(provctrl.refchartsinks...)
+			refsyms = get_reference_symbols(provctrl.refchartsinks...)
 
 			# convert to a format fast to serialize
 			hidemissings!(combineddata)
@@ -72,7 +73,7 @@ function create_snapshot(last_snapshot_time::Union{Nothing,DateTime})::TradeRunS
 				providername=provctrl.providername,
 				combineddata=combineddata,
 				refchart_colnames=refcols,
-				reference_symbols=get_reference_symbols(provctrl.refchartsinks),
+				reference_symbols=refsyms,
 				param_metadata=param_metadata,
 				AUT=AUT
 			))
