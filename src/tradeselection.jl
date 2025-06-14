@@ -25,7 +25,7 @@ function selectprovider!(summary::TradeRunSummary, provname::Symbol)
 	provsummary = getcurrentprovsummary(summary)
 	if isempty(provsummary.trades)
 		summary.curtradeidx = 0
-		summary.curdate = provsummary.combineddata.dateordinal[1]
+		summary.curdate = combineddata(provsummary).dateordinal[1]
 		return (provname, nothing)
 	else
 		summary.curtradeidx = 1
@@ -130,7 +130,7 @@ function nextday!(summary::TradeRunSummary, offset::Int=1)
 	end
 	
 	provsummary = getcurrentprovsummary(summary)
-	bm1 = provsummary.combineddata
+	bm1 = combineddata(provsummary)
 	
 	if offset > 0
 		ind = searchsortedlast(bm1.dateordinal, summary.curdate) + offset
@@ -168,7 +168,7 @@ function firstday!(summary::TradeRunSummary)
 	end
 	
 	provsummary = getcurrentprovsummary(summary)
-	bm1 = provsummary.combineddata
+	bm1 = combineddata(provsummary)
 	
 	if isempty(bm1.dateordinal)
 		error("No data available for provider $(summary.curtradeprov_name)")
@@ -191,7 +191,7 @@ function lastday!(summary::TradeRunSummary)
 	end
 	
 	provsummary = getcurrentprovsummary(summary)
-	bm1 = provsummary.combineddata
+	bm1 = combineddata(provsummary)
 	
 	if isempty(bm1.dateordinal)
 		error("No data available for provider $(summary.curtradeprov_name)")

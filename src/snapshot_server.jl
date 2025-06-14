@@ -29,21 +29,6 @@ function create_verbose_snapshot(traderun_idx::Int, provider_name::Symbol, start
 end
 
 """
-Extract parameter metadata from a TradeProviderControl
-"""
-function extract_parameter_metadata(provctrl::TradeProviderControl)
-	metadata = Dict{String, Any}()
-	
-	# Add any useful parameters from the trade provider
-	tp = tradeprovider(provctrl)
-	if haskey(tp.meta, :atrcol)
-		metadata["atrcol"] = tp.meta[:atrcol]
-	end
-	
-	return metadata
-end
-
-"""
 Server-side function that returns minimal data for RPC transfer
 """
 function create_snapshot(last_snapshot_time::Union{Nothing,DateTime})::TradeRunSnapshot
@@ -85,12 +70,37 @@ function unlock_context(ctx::TradeRunContext)
 	end
 end
 
-function lock_runchain(provctrl::TradeProviderControl, dolock::Bool)
-	for rn in provctrl.runchain
-		if dolock
-			lock(rn.prov)
+"""
+Lock or unlock the provctrl's runchain. 
+
+A runchain is a chain of providers that ends with an AbsTradeProvider. It can have one or more MinuteBarProviders in the middle, each of which is driven by a separate thread.
+
+The runchain is locked by acquiring the semaphore for each unique thread queue number in the runchain. Note that since semaphores are NOT reentrant, we cannot lock the same queue number twice.
+"""
+function lock_runchain(provctrl::TradeProviderControl, lockit::Bool=true)
+	provs2lock = unique(prov -> prov.queue_num, [runnode.prov for runnode in provctrl.runchain])
+	for prov in provs2lock
+		@info "$(lockit ? "locking" : "unlocking") $(typeof(prov).name.name)'s queue numbered $(prov.queue_num)"
+		if lockit
+			sp.acquire_queue(prov)
 		else
-			unlock(rn.prov)
+			sp.release_queue(prov)
+		end
 		end
 	end
+
+# Helper function to extract relevant parameters
+function extract_parameter_metadata(provctrl::TradeProviderControl)::Dict{String, Any}
+	metadata = Dict{String, Any}()
+	
+	for runnode in provctrl.runchain
+		prov = runnode.prov
+		# Check if provider has parameter with atrcol
+		if hasfield(typeof(prov), :P) && hasfield(typeof(prov.P), :atrcol)
+			metadata["atrcol"] = prov.P.atrcol
+		end
+		# Can extend for other important parameters
+	end
+	
+	return metadata
 end
