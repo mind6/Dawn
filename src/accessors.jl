@@ -15,7 +15,7 @@ function get_reference_columnnames(refchartsinks::sp.RefChartSink...)::Vector{Sy
 	for refsink in refchartsinks
 		for aut in sp.get_reference_AUTs(refsink)
 			for field in refsink.ref_fields
-				colname = sp.get_refdata_columnname(refsink, aut, field)
+				colname = sp.get_refdata_columnname(aut, field)
 				push!(cols, colname)
 			end
 		end
