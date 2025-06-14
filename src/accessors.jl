@@ -10,6 +10,17 @@ function get_tradeprovctrls()::AbstractVector{TradeProviderControl}
 	traderuns[selected_idx].trprov_ctrls
 end
 
+function get_reference_columnnames_from_symbols(reference_symbols::Vector{String}, ref_fields::Vector{Symbol}=[:close])::Vector{Symbol}
+	cols = Symbol[]
+	for sym in reference_symbols
+		for field in ref_fields
+			colname = sp.get_refdata_columnname(sym, field)
+			push!(cols, colname)
+		end
+	end
+	cols
+end
+
 function get_reference_columnnames(refchartsinks::sp.RefChartSink...)::Vector{Symbol}
 	cols = Symbol[]
 	for refsink in refchartsinks
@@ -99,7 +110,7 @@ function get_current_bm1(summary::TradeRunSummary)
 	end
 	
 	provsummary = getcurrentprovsummary(summary)
-	bm1 = provsummary.combineddata
+	bm1 = combineddata(provsummary)
 	
 	bm1start = searchsortedfirst(bm1.dateordinal, summary.curdate)
 	bm1end = searchsortedlast(bm1.dateordinal, summary.curdate)
@@ -116,7 +127,7 @@ function get_twodays_bm1(summary::TradeRunSummary)
 	end
 	
 	provsummary = getcurrentprovsummary(summary)
-	bm1 = provsummary.combineddata
+	bm1 = combineddata(provsummary)
 	
 	bm1start = searchsortedfirst(bm1.dateordinal, summary.curdate)
 	bm1end = searchsortedlast(bm1.dateordinal, summary.curdate)
@@ -125,6 +136,18 @@ function get_twodays_bm1(summary::TradeRunSummary)
 	end
 	
 	@view bm1[bm1start:bm1end, :]
+end
+
+"""
+Get provider data for a specific provider name from a TradeRunSnapshot
+"""
+function get_provider_data(snapshot::TradeRunSnapshot, providername::Symbol)
+	for prov_data in snapshot.provider_data
+		if prov_data.providername == providername
+			return prov_data
+		end
+	end
+	return nothing
 end
 
 """
@@ -137,35 +160,28 @@ function get_current_bday(summary::TradeRunSummary)
 	end
 	
 	providername, curdate = dateid
+	
+	# Get provider data directly from source snapshot
+	current_prov_data = get_provider_data(summary.source_snapshot, providername)
+	if current_prov_data === nothing
+		@warn "Provider data not found for $providername"
+		return nothing
+	end
+	
 	symbol = split(String(providername), '!')[2]
 	
-	# Find current provider's data from snapshot
-	current_prov_data = nothing
-	for prov_data in summary.source_snapshot.provider_data
-		if prov_data.providername == providername
-			current_prov_data = prov_data
-			break
-		end
-	end
-	
 	# Create cache key that includes reference symbols to detect changes
-	cache_key = if current_prov_data !== nothing
-		string(symbol, "_", hash(current_prov_data.reference_symbols))
-	else
-		symbol
-	end
+	cache_key = string(symbol, "_", hash(current_prov_data.reference_symbols))
 	
 	# Cache invalidation - check if symbol or reference symbols changed
 	if summary.curbday === nothing || metadata(summary.curbday, "cache_key", "") != cache_key
 		# Load main asset's daily data
 		base_bday = MyData.AssetData(symbol).bday
 		
-		# Collect reference column names for metadata
-		ref_close_cols = Symbol[]
-		
 		# Enhance with reference data if available
-		if current_prov_data !== nothing && !isempty(current_prov_data.reference_symbols)
+		if !isempty(current_prov_data.reference_symbols)
 			enhanced_bday = copy(base_bday)  # Start with main asset data
+			ref_close_cols = Symbol[]
 			
 			# Add reference symbols' close data
 			for ref_symbol in current_prov_data.reference_symbols
@@ -190,11 +206,8 @@ function get_current_bday(summary::TradeRunSummary)
 		end
 		
 		# Get atrcol from param_metadata if available
-		atrcol = if current_prov_data !== nothing && haskey(current_prov_data.param_metadata, "atrcol")
-			Symbol(current_prov_data.param_metadata["atrcol"])
-		else
-			nothing
-		end
+		atrcol = haskey(current_prov_data.param_metadata, "atrcol") ? 
+			Symbol(current_prov_data.param_metadata["atrcol"]) : nothing
 		
 		# Set metadata for cache management and plotting
 		metadata!(summary.curbday, "symbol", symbol; style=:note)
@@ -237,7 +250,7 @@ function get_bm1_row(summary::TradeRunSummary, provname::Symbol, datetime::DateT
 	if provsummary === nothing
 		return DataFrame()
 	end
-	df = provsummary.combineddata
+	df = combineddata(provsummary)
 	df[MyData.getloc(df, datetime), :]
 end
 
@@ -249,7 +262,7 @@ function get_bm1_rows(summary::TradeRunSummary, provname::Symbol, date::UnixDate
 	if provsummary === nothing
 		return DataFrame()
 	end
-	bm1 = provsummary.combineddata
+	bm1 = combineddata(provsummary)
 	
 	bm1start = searchsortedfirst(bm1.dateordinal, date)
 	bm1end = searchsortedlast(bm1.dateordinal, date)

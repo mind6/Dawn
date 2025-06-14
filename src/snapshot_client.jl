@@ -48,26 +48,13 @@ function summarize_snapshot(snapshot::TradeRunSnapshot)::TradeRunSummary
 		exitprefixes = Set{Symbol}()
 		
 		for trade_row in eachrow(trades)
-			# Start building the row
-			newrow = Pair{Symbol, Any}[
-				:provider => prov_data.providername,
-				:AUT_close => trade_row.close,
-				:datetime => trade_row.datetime
-			]
+			colnames = [[:datetime, :tradeaction]; prov_data.refchart_colnames]
 			
-			# Add tradeaction if present
-			if hasproperty(trade_row, :tradeaction) && !ismissing(trade_row.tradeaction)
-				push!(newrow, :tradeaction => trade_row.tradeaction)
+			newrow = Pair{Symbol, Any}[:provider => prov_data.providername, :AUT_close => trade_row.close]
+			for colname in colnames
+				push!(newrow, colname => trade_row[colname])
 			end
 			
-			# Add reference columns
-			for colname in prov_data.refchart_colnames
-				if hasproperty(trade_row, colname)
-					push!(newrow, colname => trade_row[colname])
-				end
-			end
-			
-			# Process exit strategies
 			for strat in trade_row.exitstrat_onenter
 				pre = sp.typeprefix(strat)
 				push!(newrow, Symbol(pre, :_frac_return) => strat.frac_return)
@@ -80,77 +67,71 @@ function summarize_snapshot(snapshot::TradeRunSnapshot)::TradeRunSummary
 			push!(exitres, NamedTuple(newrow); cols=:union)
 		end
 		
-		# Set metadata
-		metadata!(trades, "symbol", prov_data.AUT; style=:note)
-		metadata!(prov_data.combineddata, "symbol", prov_data.AUT; style=:note)
-		
-		# Create provider summary
+		# Create provider summary using the new simplified structure
 		summary = TradeProviderSummary(
-			prov_data.providername,
-			prov_data.refchart_colnames,
-			prov_data.combineddata, # Keep full combineddata for functions like get_twodays_bm1
+			prov_data,     # Store a reference to the original provider_data
 			trades,
 			exitres,
 			exitprefixes
 		)
 		
 		push!(provider_summaries, summary)
-		provname2summary[summary.providername] = summary
+		provname2summary[prov_data.providername] = summary
 	end
-	
-	# Generate trade summaries
+
+	# Combine all provider trades into a single dataframe
+	all_exitres = [summary.exitres for summary in provider_summaries]
+	if isempty(all_exitres)
+		@warn "No trade results found in snapshot."
+	end
+
+	# Prepare return column and profit column identifiers
 	retcol = Symbol(snapshot.strategy_prefix, :_log_return)
 	profit_col = Symbol(snapshot.strategy_prefix, :_dollar_profit)
-	
-	all_exitres = [summary.exitres for summary in provider_summaries]
-	
-	# Create merged trade summary
-	tradesummary = let df = DataFrame()
-		if !isempty(all_exitres)
-			df = vcat(all_exitres...; cols=:union)
-			if !isempty(df)
-				sort!(df, :datetime)
-				
-				# Add month column and cumulative metrics
-				df.month = Dates.floor.(df.datetime, Dates.Month)
-				transform!(df, retcol => cumsum => :combined_cumret)
-				
-				# Add metadata if calculations are possible
-				if !isempty(df) && retcol in propertynames(df) && profit_col in propertynames(df)
-					if !all(ismissing, df[!, retcol])
-						sortino_val = MyMath.sortinoratio_annualized(df; logret_col=retcol)
-						if !isempty(sortino_val)
-							metadata!(df, "sortinoratio", sortino_val[1]; style=:note)
-						end
-					end
-					metadata!(df, "dollar_profit", mean(skipmissing(df[!, profit_col])); style=:note)
-					metadata!(df, "log_ret", mean(skipmissing(df[!, retcol])); style=:note)
-				end
-			end
+
+	### create the trade summary dataframe
+	tradesummary = let df = vcat(all_exitres...; cols=:union)
+		sort!(df, :datetime)
+		colnames = propertynames(df)
+		if !isempty(df) && (retcol ∉ colnames || profit_col ∉ colnames)
+			error("Column $retcol or $profit_col not found in trade summary with $(nrow(df)) rows. The following columns are present: $colnames")
 		end
+
+		# Set up month column for monthly summaries
+		df.month = Dates.floor.(df.datetime, Dates.Month)
+		
+		# Create aggregated metrics
+		transform!(df, 
+			retcol => cumsum => :combined_cumret)
+		
+		# Add metadata
+		metadata!(df, "sortinoratio", MyMath.sortinoratio_annualized(df; logret_col=retcol)[1]; style=:note)
+		metadata!(df, "dollar_profit", mean(df[!, profit_col]); style=:note)
+		metadata!(df, "log_ret", mean(df[!, retcol]); style=:note)
 		df
 	end
-	
-	# Create grouped summaries
-	tradesummary_byprov = if !isempty(tradesummary) && :provider in propertynames(tradesummary)
-		gdf = groupby(tradesummary, :provider)
-		if retcol in propertynames(tradesummary)
-			transform!(gdf, retcol => cumsum => :provider_cumret)
+
+	### create the grouped trade summary dataframe
+	tradesummary_byprov = let gdf = groupby(tradesummary, :provider)
+		# Validate grouped trades
+		for grp in gdf
+			if !issorted(grp.datetime)
+				@error "$(first(grp.provider)) trades are not sorted by datetime"
+			end
+			if !allunique(grp.datetime)
+				@warn "$(first(grp.provider)) has multiple trades at the same timestamp"
+			end
 		end
+		transform!(gdf, retcol => cumsum => :provider_cumret)
 		gdf
-	else
-		groupby(DataFrame(provider=Symbol[]), :provider)
 	end
 	
 	# Create monthly summaries
-	monthsummary, monthsummary_byprov, monthsummary_combined = if !isempty(tradesummary) && retcol in propertynames(tradesummary)
-		create_monthly_summaries(tradesummary, retcol)
-	else
-		DataFrame(), groupby(DataFrame(provider=Symbol[]), :provider), DataFrame()
-	end
+	monthsummary, monthsummary_byprov, monthsummary_combined = create_monthly_summaries(tradesummary, retcol)
 	
+	# Return the complete summary with initialized navigation state
 	return TradeRunSummary(
-		snapshot,
+		snapshot,          # Keep a reference to the original snapshot
 		provider_summaries,
 		provname2summary,
 		tradesummary,
@@ -165,3 +146,21 @@ function summarize_snapshot(snapshot::TradeRunSnapshot)::TradeRunSummary
 	)
 end
 
+"""
+Create monthly summary dataframes
+"""
+function create_monthly_summaries(tradesummary::AbstractDataFrame, retcol::Symbol)
+	# Monthly returns by provider
+	gb = groupby(tradesummary, [:provider, :month])
+	df = combine(gb, retcol => sum => :prov_mo_ret)
+	monthsummary_byprov = groupby(df, :provider)
+	monthsummary = transform!(monthsummary_byprov, :prov_mo_ret => cumsum => :prov_cum_mo_ret)
+	
+	# Monthly returns combined across all providers
+	df = combine(groupby(monthsummary, :month), :prov_mo_ret => sum => :combined_mo_ret)
+	transform!(df, :combined_mo_ret => cumsum => :combined_cum_mo_ret)
+	monthsummary_combined = df
+	metadata!(monthsummary_combined, "sortinoratio", MyMath.sortinoratio_annualized(df; datetime_col=:month, logret_col=:combined_mo_ret)[1]; style=:note)
+	
+	return (monthsummary, monthsummary_byprov, monthsummary_combined)
+end

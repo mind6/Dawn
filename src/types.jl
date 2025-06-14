@@ -32,13 +32,18 @@ end
 Summarization data for a single trade provider
 """
 struct TradeProviderSummary
-	providername::Symbol
-	refchart_colnames::Vector{Symbol}  #reference data column names available in both combineddata and all derived trade summaries
-	combineddata::DataFrame  #all data from the runchain, including reference data
-	trades::DataFrame        #filtered combineddata to include only trades
-	exitres::DataFrame       #melted trades dataframe with rows corresponding to tradeactions like enter, exit, etc.
-	exitprefixes::Set{Symbol}  #uniquely identifies exit strategies which have been detected in TradeProvider
+	provider_data::NamedTuple  # Reference to corresponding element in TradeRunSnapshot.provider_data
+	trades::DataFrame          # filtered combineddata to include only trades
+	exitres::DataFrame         # melted trades dataframe with rows corresponding to tradeactions like enter, exit, etc.
+	exitprefixes::Set{Symbol}  # uniquely identifies exit strategies which have been detected in TradeProvider
 end
+
+# Helper accessor methods for TradeProviderSummary
+providername(summary::TradeProviderSummary) = summary.provider_data.providername
+combineddata(summary::TradeProviderSummary) = summary.provider_data.combineddata
+refchart_colnames(summary::TradeProviderSummary) = summary.provider_data.refchart_colnames
+reference_symbols(summary::TradeProviderSummary) = summary.provider_data.reference_symbols
+aut(summary::TradeProviderSummary) = summary.provider_data.AUT
 
 ################################################################################
 """
