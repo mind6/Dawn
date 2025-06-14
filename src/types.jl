@@ -8,12 +8,12 @@ struct TradeRunSnapshot
 
 	# Raw combined data for each provider 
 	provider_data::Vector{@NamedTuple{
-		providername::Symbol, 
-		combineddata::DataFrame, 
-		refchart_colnames::Vector{Symbol}, 
-		reference_symbols::Vector{String},
-		param_metadata::Dict{String, Any},
-		AUT::String
+		providername::Symbol, 		#pathname!AUT
+		combineddata::DataFrame,	#total data from the StreamProviders that are part of the runchain. This is used to generate the TradeProviderSummary.
+		refchart_colnames::Vector{Symbol}, 	#requires RefChartSink.ref_fields so they need to be generated on the server side. This is used to generate the TradeProviderSummary.
+		reference_symbols::Vector{String},	#asset symbols independent of ref_fields. This is used to generate the TradeProviderSummary.
+		param_metadata::Dict{String, Any},	#params such as atrcol extracted from the runchain. This is used to generate the TradeProviderSummary.
+		AUT::String		#Asset Under Trade.
 	}}
 	
 	# Snapshot timing information 
