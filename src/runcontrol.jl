@@ -10,7 +10,7 @@ Note: The columns synchronized by refchartsinks can be customized in two ways:
 function createtraderun(run_name::Symbol, args...; kwargs...)
 	createtraderun(run_name, getproperty(sg, run_name), args...; kwargs...)
 end
-function createtraderun(run_name::Symbol, runspec::sg.RunSpec, usecache::Bool=true; ignore_cache::Vector{Type{<:Provider}}=Type{<:Provider}[])
+function createtraderun(run_name::Symbol, runspec::sg.RunSpec; usecache::Bool=true, ignore_cache::Vector{Type{<:Provider}}=Type{<:Provider}[])
 	r = sg.TradeRun(runspec, usecache; ignore_cache=ignore_cache)	
 	sg.instantiate!(r)
 
@@ -38,7 +38,7 @@ This is a nonblocking call. Use wait4traderun() to wait for it to complete.
 
 NOTE:In the future this should create listeners for transaction requests and responses.
 """
-function executetraderun(saveproviders::Bool=true)
+function executetraderun(;saveproviders::Bool=true)
 	if selected_idx ∉ 1:length(traderuns)
 		@error "no valid TradeRun selected at $selected_idx"
 		return
