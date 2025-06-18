@@ -14,7 +14,7 @@ begin
 	deletetraderuns()
 
 	# createtraderun(:run_a3_1, true)
-	createtraderun(:run_a3_1; usecache=false, ignore_cache=Type{<:Provider}[PrevDayMinuteBarProvider, BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
+	createtraderun(:run_a3_1; usecache=true, ignore_cache=Type{<:Provider}[PrevDayMinuteBarProvider, BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
 
 	executetraderun(saveproviders=true)
 
@@ -26,5 +26,5 @@ end
 
 begin
 	Dawn.RPCServer.stop_server()
-	wait(Threads.@spawn Dawn.RPCServer.start_server(port=8082))
+	wait(Threads.@spawn Dawn.RPCServer.start_server(port=8081))
 end
