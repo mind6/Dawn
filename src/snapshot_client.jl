@@ -114,20 +114,28 @@ function summarize_snapshot(snapshot::TradeRunSnapshot)::TradeRunSummary
 
 	### report if the tradesummary matches the expected outcome
 	trade_outcome = metadata(tradesummary)
-	@info "[summarize_snapshot] tradesummary has following results:\n$(repr(trade_outcome))"
-	runspec = getfield(Strategies2, snapshot.run_name)
-	if isempty(runspec.expected_outcome)
-		@info "$run_name_str did not specify expected results"
-	else
-		run_name_str = "$(TerminalStyles.YELLOW) $(snapshot.run_name) $(TerminalStyles.END)"
-		@info "[summarize_snapshot] $run_name_str expected following results:\n$(repr(runspec.expected_outcome))"
-		for (k, v) in runspec.expected_outcome
-			if !haskey(trade_outcome, k)
-				@error "$run_name_str expected result $k not found in tradesummary"
-			elseif !isapprox(trade_outcome[k], v)
-				@error "$run_name_str expected result $k = $v but got $(trade_outcome[k])"
+	@info "[summarize_snapshot] tradesummary created with following results:\n$(repr(trade_outcome))"
+	runname, runspec = snapshot.runinfo
+	runname_str = TerminalStyles.YELLOW * String(runname) * TerminalStyles.END
+	if runspec isa sg.HistoricalRun
+		if isempty(runspec.expected_outcome)
+			@info "[summarize_snapshot] $runname_str did not specify expected results"
+		else
+			haserror = false
+			for (k, v) in runspec.expected_outcome
+				if !haskey(trade_outcome, k)
+					haserror = true
+					@error "[summarize_snapshot] $runname_str expected result $k not found in tradesummary"
+				elseif !isapprox(trade_outcome[k], v)
+					haserror = true
+					@error "[summarize_snapshot] $runname_str expected result $k = $v but got $(trade_outcome[k])"
+				end
 			end
+			pass_str = haserror ? TerminalStyles.RED * "FAILED" * TerminalStyles.END : TerminalStyles.GREEN * "PASSED" * TerminalStyles.END
+			@info "[summarize_snapshot] $runname_str $pass_str while expecting:\n$(repr(runspec.expected_outcome))"
 		end
+	else
+		@info "[summarize_snapshot] $runname_str is a $(typeof(runspec))"
 	end
 
 	### create the grouped trade summary dataframe

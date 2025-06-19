@@ -7,7 +7,7 @@ struct TradeRunSnapshot
 	traderun_idx::Union{Nothing, Int}  #index of the traderun in the global traderuns array. May be set to nothing if a request is made to free the trade run associated with this snapshot.
 	
 	# this is useful to have on the client side to get RunSpec details such as expected_outcome
-	run_name::Symbol
+	runinfo::@NamedTuple{name::Symbol, spec::sg.RunSpec}
 
 	# Raw combined data for each provider 
 	provider_data::Vector{@NamedTuple{

@@ -48,7 +48,7 @@ function create_snapshot(last_snapshot_time::Union{Nothing,DateTime})::TradeRunS
 
 		return TradeRunSnapshot(
 			Dawn.selectedidx(),
-			ctx.info.run_name,
+			(name=ctx.info.run_name, spec=ctx.info.r.spec),
 			provider_data,
 			now(),
 			last_snapshot_time,

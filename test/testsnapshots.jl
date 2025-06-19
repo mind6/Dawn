@@ -14,7 +14,8 @@ test_plan = PlanNodeSpec[
 	@namevaluepair(path_a) => ["VXX"]
 ]
 
-test_run::RunSpec = HistoricalRun(test_plan, DateInterval(Date(2019, 8, 1), Date(2019, 9,1)))
+test_run::RunSpec = HistoricalRun(test_plan, DateInterval(Date(2019, 8, 1), Date(2019, 9,1));
+	expected_outcome=Dict("dollar_profit" => 0.23, "tot_ret" => 0.01711006f0))
 
 # @profview_allocs
 begin
@@ -24,7 +25,7 @@ begin
 end
 
 begin
-	executetraderun(saveproviders=false)
+	executetraderun(saveproviders=true)
 
 # ctrl = Dawn.provname2provctrl[:path_a3!TSLA]
 
