@@ -20,11 +20,11 @@ test_run::RunSpec = HistoricalRun(test_plan, DateInterval(Date(2019, 8, 1), Date
 begin
 	deletetraderuns()
 
-	createtraderun(@namevaluepair(test_run)..., true; ignore_cache=Type{<:Provider}[PrevDayMinuteBarProvider,BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
+	createtraderun(@namevaluepair(test_run)...; usecache=true, ignore_cache=Type{<:Provider}[PrevDayMinuteBarProvider,BasicStatsProvider, SparseStatsProvider,AbsTradeProvider])
 end
 
 begin
-	executetraderun(false)
+	executetraderun(saveproviders=false)
 
 # ctrl = Dawn.provname2provctrl[:path_a3!TSLA]
 
