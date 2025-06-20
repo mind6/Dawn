@@ -14,16 +14,19 @@ The function exists to support detailed analysis of specific trading periods (ty
 """
 function create_verbose_snapshot(traderun_idx::Int, provider_name::Symbol, startdate::UnixDate, enddate::UnixDate)::TradeRunSnapshot
 	saved_traderun_idx = Dawn.selectedidx()
+	ret =let
+		selecttraderun(traderun_idx)
 
-	origplan = Dawn.traderuns[Dawn.selectedidx()].info.r.spec.plan
-	shortplan = sg.create_single_asset_plan(origplan, 
-		split(String(provider_name), '!')...);
-	shortrun::sg.RunSpec = sg.HistoricalRun(shortplan, DateInterval(startdate, enddate); verbose=true)
+		origplan = Dawn.traderuns[Dawn.selectedidx()].info.r.spec.plan
+		shortplan = sg.create_single_asset_plan(origplan, 
+			split(String(provider_name), '!')...);
+		shortrun::sg.RunSpec = sg.HistoricalRun(shortplan, DateInterval(startdate, enddate); verbose=true)
 
-	createtraderun(@namevaluepair(shortrun)..., false)
-	executetraderun(false)
-	@time wait4traderun()
-	ret = create_snapshot(nothing)
+		createtraderun(@namevaluepair(shortrun)...; usecache=false)
+		executetraderun(saveproviders=false)
+		@time wait4traderun()
+		create_snapshot(nothing)
+	end
 	Dawn.selecttraderun(saved_traderun_idx)		
 	return ret
 end

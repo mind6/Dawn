@@ -54,6 +54,14 @@ begin
 	@test d1 != d2
 end
 
+begin
+	ss = create_verbose_snapshot(1, :path_a!VXX, UnixDate(Date(2019, 8, 18)), UnixDate(Date(2019, 8, 20)))
+	snapsma2 = summarize_snapshot(ss)
+	Dawn.selectprovider!(snapsma2, :path_a!VXX)
+	Dawn.getcurrenttradeid(snapsma2)
+	Dawn.getcurrentdateid(snapsma2)
+	Dawn.nextday!(snapsma2)
+end
 #=
 This code is a testing and profiling section that:
 1. Extracts a DataFrame from a snapshot and analyzes its column types and sizes
