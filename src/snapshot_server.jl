@@ -63,14 +63,26 @@ function create_snapshot(last_snapshot_time::Union{Nothing,DateTime})::TradeRunS
 end
 
 function lock_context(ctx::TradeRunContext)
-	for provctrl in ctx.trprov_ctrls
-		lock_runchain(provctrl, true)
+	# Collect all unique providers across all provctrls
+	all_provs = unique(
+		prov -> prov.queue_num,
+		[runnode.prov for provctrl in ctx.trprov_ctrls for runnode in provctrl.runchain]
+	)
+	for prov in all_provs
+		@info "locking $(sp.symbol(prov)) $(typeof(prov).name.name)'s queue numbered $(prov.queue_num)"
+		sp.acquire_queue(prov)
 	end
 end
 
 function unlock_context(ctx::TradeRunContext)
-	for provctrl in ctx.trprov_ctrls
-		lock_runchain(provctrl, false)
+	# Collect all unique providers across all provctrls
+	all_provs = unique(
+		prov -> prov.queue_num,
+		[runnode.prov for provctrl in ctx.trprov_ctrls for runnode in provctrl.runchain]
+	)
+	for prov in all_provs
+		@info "unlocking $(sp.symbol(prov)) $(typeof(prov).name.name)'s queue numbered $(prov.queue_num)"
+		sp.release_queue(prov)
 	end
 end
 
@@ -90,8 +102,8 @@ function lock_runchain(provctrl::TradeProviderControl, lockit::Bool=true)
 		else
 			sp.release_queue(prov)
 		end
-		end
 	end
+end
 
 # Helper function to extract relevant parameters
 function extract_parameter_metadata(provctrl::TradeProviderControl)::Dict{String, Any}
